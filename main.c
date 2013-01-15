@@ -23,7 +23,7 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#define F_CPU 80000000
+#define F_CPU 80000000 // 80 MHz
 #include "inc/hw_types.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
