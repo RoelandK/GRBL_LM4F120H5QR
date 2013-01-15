@@ -32,7 +32,8 @@
 
 // Define pin-assignments
 // NOTE: All step bit and direction pins must be on the same port.
-#define STEPPING_DDR       DDRD
+#define STEPPING_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define STEPPING_DDR       GPIO_PORTF_BASE //DDRD for AVR, GPIO_PORTF_BASE for Cortex
 #define STEPPING_PORT      PORTD
 #define X_STEP_BIT         2  // Uno Digital Pin 2
 #define Y_STEP_BIT         3  // Uno Digital Pin 3
@@ -44,32 +45,39 @@
 #define DIRECTION_MASK ((1<<X_DIRECTION_BIT)|(1<<Y_DIRECTION_BIT)|(1<<Z_DIRECTION_BIT)) // All direction bits
 #define STEPPING_MASK (STEP_MASK | DIRECTION_MASK) // All stepping-related bits (step/direction)
 
-#define STEPPERS_DISABLE_DDR    DDRB
+#define STEPPERS_DISABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
+#define STEPPERS_DISABLE_DDR    GPIO_PORTB_BASE //DDRB for AVR, GPIO_PORTB_BASE for Cortex
 #define STEPPERS_DISABLE_PORT   PORTB
 #define STEPPERS_DISABLE_BIT    0  // Uno Digital Pin 8
 #define STEPPERS_DISABLE_MASK (1<<STEPPERS_DISABLE_BIT)
 
 // NOTE: All limit bit pins must be on the same port
-#define LIMIT_DDR       DDRB
+#define LIMIT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
+#define LIMIT_DDR       GPIO_PORTB_BASE //DDRB for AVR, GPIO_PORTB_BASE for Cortex
 #define LIMIT_PIN       PINB
 #define LIMIT_PORT      PORTB
 #define X_LIMIT_BIT     1  // Uno Digital Pin 9
 #define Y_LIMIT_BIT     2  // Uno Digital Pin 10
 #define Z_LIMIT_BIT     3  // Uno Digital Pin 11
-#define LIMIT_INT       PCIE0  // Pin change interrupt enable pin
-#define LIMIT_INT_vect  PCINT0_vect 
-#define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
 #define LIMIT_MASK ((1<<X_LIMIT_BIT)|(1<<Y_LIMIT_BIT)|(1<<Z_LIMIT_BIT)) // All limit bits
 
-#define SPINDLE_ENABLE_DDR   DDRB
+// Config for interrupt on pin change (pins for limit switches) todo
+//#define LIMIT_INT       PCIE0  // Pin change interrupt enable pin
+//#define LIMIT_INT_vect  PCINT0_vect
+//#define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
+
+#define SPINDLE_ENABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
+#define SPINDLE_ENABLE_DDR   GPIO_PORTB_BASE //DDRB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_ENABLE_PORT  PORTB
 #define SPINDLE_ENABLE_BIT   4  // Uno Digital Pin 12
 
-#define SPINDLE_DIRECTION_DDR   DDRB
+#define SPINDLE_DIRECTION_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
+#define SPINDLE_DIRECTION_DDR   GPIO_PORTB_BASE //DDRB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_DIRECTION_PORT  PORTB
 #define SPINDLE_DIRECTION_BIT   5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
 
-#define COOLANT_FLOOD_DDR   DDRC
+#define COOLANT_FLOOD_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
+#define COOLANT_FLOOD_DDR   GPIO_PORTC_BASE //DDRC for AVR, GPIO_PORTC_BASE for Cortex
 #define COOLANT_FLOOD_PORT  PORTC
 #define COOLANT_FLOOD_BIT   3  // Uno Analog Pin 3
 
@@ -77,22 +85,26 @@
 // a later date if flash and memory space allows.
 // #define ENABLE_M7  // Mist coolant disabled by default. Uncomment to enable.
 #ifdef ENABLE_M7
-  #define COOLANT_MIST_DDR   DDRC
+  #define COOLANT_MIST_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
+  #define COOLANT_MIST_DDR   GPIO_PORTC_BASE //DDRC for AVR, GPIO_PORTC_BASE for Cortex
   #define COOLANT_MIST_PORT  PORTC
   #define COOLANT_MIST_BIT   4 // Uno Analog Pin 4
 #endif  
 
 // NOTE: All pinouts pins must be on the same port
-#define PINOUT_DDR       DDRC
+#define PINOUT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
+#define PINOUT_DDR       GPIO_PORTC_BASE //DDRC for AVR, GPIO_PORTC_BASE for Cortex
 #define PINOUT_PIN       PINC
 #define PINOUT_PORT      PORTC
 #define PIN_RESET        0  // Uno Analog Pin 0
 #define PIN_FEED_HOLD    1  // Uno Analog Pin 1
 #define PIN_CYCLE_START  2  // Uno Analog Pin 2
-#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin
-#define PINOUT_INT_vect  PCINT1_vect
-#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register
 #define PINOUT_MASK ((1<<PIN_RESET)|(1<<PIN_FEED_HOLD)|(1<<PIN_CYCLE_START))
+
+// Config for interrupt on pin change (pins for reset, feed hold and cycle start buttons) todo
+//#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin
+//#define PINOUT_INT_vect  PCINT1_vect
+//#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register
 
 // Define runtime command special characters. These characters are 'picked-off' directly from the
 // serial read data stream and are not passed to the grbl line execution parser. Select characters

@@ -23,39 +23,47 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
+#define F_CPU 80000000
+#include "inc/hw_types.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/fpu.h"
+
 #include "config.h"
 #include "planner.h"
 #include "nuts_bolts.h"
 #include "stepper.h"
-#include "spindle_control.h"
-#include "coolant_control.h"
-#include "motion_control.h"
-#include "gcode.h"
-#include "protocol.h"
-#include "limits.h"
-#include "report.h"
-#include "settings.h"
-#include "serial.h"
+//#include "spindle_control.h"
+//#include "coolant_control.h"
+//#include "motion_control.h"
+//#include "gcode.h"
+//#include "protocol.h"
+//#include "limits.h"
+//#include "report.h"
+//#include "settings.h"
+//#include "serial.h"
 
 // Declare system global variable structure
-system_t sys; 
+system_t sys;
 
 int main(void)
 {
+	SysCtlClockSet( SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN ); //set system clock to 80 MHz
+	FPUEnable(); //enable the Floating Point Unit
+	FPUStackingEnable(); // Enable stacking for interrupt handlers
+
   // Initialize system
   serial_init(); // Setup serial baud rate and interrupts
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
-  sei(); // Enable interrupts
-  
+//  sei(); // Enable interrupts
+
   memset(&sys, 0, sizeof(sys));  // Clear all system variables
   sys.abort = true;   // Set abort to complete initialization
   sys.state = STATE_INIT;  // Set alarm state to indicate unknown initial position
-  
+
   for(;;) {
-  
+
     // Execute system reset upon a system abort, where the main program will return to this loop.
     // Once here, it is safe to re-initialize the system. At startup, the system will automatically
     // reset to finish the initialization process.
@@ -71,14 +79,14 @@ int main(void)
       st_reset(); // Clear stepper subsystem variables.
 
       // Sync cleared gcode and planner positions to current system position, which is only
-      // cleared upon startup, not a reset/abort. 
+      // cleared upon startup, not a reset/abort.
       sys_sync_current_position();
 
       // Reset system variables.
       sys.abort = false;
       sys.execute = 0;
       if (bit_istrue(settings.flags,BITFLAG_AUTO_START)) { sys.auto_start = true; }
-      
+
       // Check for power-up and set system alarm if homing is enabled to force homing cycle
       // by setting Grbl's alarm state. Alarm locks out all g-code commands, including the
       // startup scripts, but allows access to settings and internal commands. Only a homing
@@ -89,20 +97,20 @@ int main(void)
       #ifdef HOMING_INIT_LOCK
         if (sys.state == STATE_INIT && bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE)) { sys.state = STATE_ALARM; }
       #endif
-      
+
       // Check for and report alarm state after a reset, error, or an initial power up.
       if (sys.state == STATE_ALARM) {
-        report_feedback_message(MESSAGE_ALARM_LOCK); 
+        report_feedback_message(MESSAGE_ALARM_LOCK);
       } else {
         // All systems go. Set system to ready and execute startup script.
         sys.state = STATE_IDLE;
-        protocol_execute_startup(); 
+        protocol_execute_startup();
       }
     }
-    
+
     protocol_execute_runtime();
     protocol_process(); // ... process the serial protocol
-    
+
   }
   return 0;   /* never reached */
 }
