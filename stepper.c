@@ -22,7 +22,12 @@
 /* The timer calculations of this module informed by the 'RepRap cartesian firmware' by Zack Smith
    and Philipp Tiefenbacher. */
 
-//#include <avr/interrupt.h>
+///#include <avr/interrupt.h>
+#include "inc/hw_ints.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/timer.h"
+
 #include "stepper.h"
 #include "config.h"
 #include "settings.h"
@@ -164,7 +169,7 @@ void timer1_compare_interrupt( void ) //todo
     GPIOPinWrite( STEPPING_PORT, STEP_MASK, out_bits );
   #endif
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
-  // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
+  // exactly 'settings.pulse_microseconds' microseconds, independent of the main Timer1 prescaler.
 ///todo  TCNT2 = step_pulse_time; // Reload timer counter
 ///todo  TCCR2B = (1<<CS21); // Begin timer2. Full speed, 1/8 prescaler
 
@@ -370,8 +375,15 @@ void st_init()
   SysCtlPeripheralEnable( STEPPERS_DISABLE_SYSCTL_PERIPH );
   GPIOPinTypeGPIOOutput( STEPPERS_DISABLE_PORT, 1<<STEPPERS_DISABLE_BIT );
 
+/* todo
   // waveform generation = 0100 = CTC
-/* todo  TCCR1B &= ~(1<<WGM13);
+  /// Timer1 (16 bit) mode:
+  /// CTC - Clear Timer on Compare
+  /// Maximum reachable value = OCR1A
+  /// TOV1 flag is set (interrupt occurs) on max value (OCR1A)
+  /// Timer1 gives interrupt frequency = F_CPU/(prescaler*(1+OCR1A))
+
+  TCCR1B &= ~(1<<WGM13);
   TCCR1B |=  (1<<WGM12);
   TCCR1A &= ~(1<<WGM11);
   TCCR1A &= ~(1<<WGM10);
@@ -380,9 +392,13 @@ void st_init()
   TCCR1A &= ~(3<<COM1A0);
   TCCR1A &= ~(3<<COM1B0);
 
-  // Configure Timer 2
+  // Configure Timer 2 (8 bit)
+  /// Maximum reachable value = 0xFF
+  /// OCRx is updated immediately
+  /// TOV flag is set (interrupt occurs) on max value (0xFF)
+  /// Timer2 gives interrupt frequency F_CPU/(prescaler*256)
   TCCR2A = 0; // Normal operation
-  TCCR2B = 0; // Disable timer until needed.
+  TCCR2B = 0; // Disable timer until needed (switch to 'no clock source')
   TIMSK2 |= (1<<TOIE2); // Enable Timer2 Overflow interrupt
   #ifdef STEP_PULSE_DELAY
     TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
@@ -401,42 +417,48 @@ static uint32_t config_step_timer(uint32_t cycles)
   uint8_t prescaler;
   uint32_t actual_cycles;
   if (cycles <= 0xffffL) {
+    ///timer1 interrupt frequency = 16'000'000/(1+cycles) = 16 MHz ... 244 Hz
     ceiling = cycles;
     prescaler = 1; // prescaler: 0
     actual_cycles = ceiling;
-  } else if (cycles <= 0x7ffffL) {
+  } else if (cycles <= 0x7ffffL) { /// <= 524287
+    ///timer1 interrupt frequency = 2'000'000/(1+cycles/8) = 244 Hz ... 30,517 Hz
     ceiling = cycles >> 3;
     prescaler = 2; // prescaler: 8
     actual_cycles = ceiling * 8L;
-  } else if (cycles <= 0x3fffffL) {
+  } else if (cycles <= 0x3fffffL) { /// <= 4194303
+    ///timer1 interrupt frequency = 250'000/(1+cycles/64) = 3,8146 Hz ... 30,514 Hz
     ceiling =  cycles >> 6;
     prescaler = 3; // prescaler: 64
     actual_cycles = ceiling * 64L;
-  } else if (cycles <= 0xffffffL) {
+  } else if (cycles <= 0xffffffL) { /// <= 16777215
+    ///timer1 interrupt frequency = 62'500/(1+cycles/256) = 0,95365 Hz ... 3,8145 Hz
     ceiling =  (cycles >> 8);
     prescaler = 4; // prescaler: 256
     actual_cycles = ceiling * 256L;
-  } else if (cycles <= 0x3ffffffL) {
+  } else if (cycles <= 0x3ffffffL) { /// <= 67108863
+    ///timer1 interrupt frequency = 15'625/(1+cycles/1024) =  0,238415 Hz ... 0,95362 Hz
     ceiling = (cycles >> 10);
     prescaler = 5; // prescaler: 1024
     actual_cycles = ceiling * 1024L;
   } else {
     // Okay, that was slower than we actually go. Just set the slowest speed
+    ///timer1 interrupt frequency = 15'625/(1+65535) = 0,238 Hz     (each 4,194304 sec)
     ceiling = 0xffff;
     prescaler = 5;
     actual_cycles = 0xffff * 1024;
   }
   // Set prescaler
-  TCCR1B = (TCCR1B & ~(0x07<<CS10)) | (prescaler<<CS10);
+///todo  TCCR1B = (TCCR1B & ~(0x07<<CS10)) | (prescaler<<CS10);
   // Set ceiling
-  OCR1A = ceiling;
+///todo  OCR1A = ceiling;
   return(actual_cycles);
 }
 
 static void set_step_events_per_minute(uint32_t steps_per_minute)
 {
   if (steps_per_minute < MINIMUM_STEPS_PER_MINUTE) { steps_per_minute = MINIMUM_STEPS_PER_MINUTE; }
-  st.cycles_per_step_event = config_step_timer((TICKS_PER_MICROSECOND*1000000*60)/steps_per_minute);
+  st.cycles_per_step_event = config_step_timer((F_CPU*60)/steps_per_minute);
 }
 
 // Planner external interface to start stepper interrupt and execute the blocks in queue. Called
