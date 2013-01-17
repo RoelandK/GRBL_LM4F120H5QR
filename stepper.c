@@ -404,6 +404,21 @@ void st_init()
     TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
   #endif
 */
+  /// Configure TIMER0 to work as two separate 16-bit timers TIMER_A and TIMER_B
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 ); ///todo
+  ///todo delay_ms(1); ///give some time for timer module to start
+  TimerConfigure( TIMER0_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP | TIMER_CFG_B_PERIODIC_UP );
+  /// TIMER_A will act as 16-bit Timer1 in AVR
+  /// TIMER_B will act as 8-bit Timer2 in AVR
+  /// Timer2 works in GRBL only with 1/8 prescaler
+  TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
+  /// Timer2 goes up till 0xFF, we make the same for 16-bit TIMER_B
+  TimerLoadSet( TIMER0_BASE, TIMER_B, 0xFF );
+
+  ///Register iterrupt handlers for timers
+  TimerIntRegister( TIMER0_BASE, TIMER_A, timer1_compare_interrupt );
+  TimerIntRegister( TIMER0_BASE, TIMER_B, timer2_overflow_interrupt );
+
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
   st_wake_up();
   st_go_idle();
@@ -419,33 +434,45 @@ static uint32_t config_step_timer(uint32_t cycles)
   if (cycles <= 0xffffL) {
     ///timer1 interrupt frequency = 16'000'000/(1+cycles) = 16 MHz ... 244 Hz
     ceiling = cycles;
-    prescaler = 1; // prescaler: 0
+    ///prescaler = 1; // prescaler: 0
     actual_cycles = ceiling;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1 * 5 ); //prescaler is x5 because ARM is 5x faster (80 MHz)
+    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x7ffffL) { /// <= 524287
     ///timer1 interrupt frequency = 2'000'000/(1+cycles/8) = 244 Hz ... 30,517 Hz
     ceiling = cycles >> 3;
-    prescaler = 2; // prescaler: 8
+    ///prescaler = 2; // prescaler: 8
     actual_cycles = ceiling * 8L;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 8 * 5 );
+    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x3fffffL) { /// <= 4194303
     ///timer1 interrupt frequency = 250'000/(1+cycles/64) = 3,8146 Hz ... 30,514 Hz
     ceiling =  cycles >> 6;
-    prescaler = 3; // prescaler: 64
+    ///prescaler = 3; // prescaler: 64
     actual_cycles = ceiling * 64L;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 64 * 5 );
+    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0xffffffL) { /// <= 16777215
     ///timer1 interrupt frequency = 62'500/(1+cycles/256) = 0,95365 Hz ... 3,8145 Hz
     ceiling =  (cycles >> 8);
-    prescaler = 4; // prescaler: 256
+    ///prescaler = 4; // prescaler: 256
     actual_cycles = ceiling * 256L;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 256 * 5 );
+    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x3ffffffL) { /// <= 67108863
     ///timer1 interrupt frequency = 15'625/(1+cycles/1024) =  0,238415 Hz ... 0,95362 Hz
     ceiling = (cycles >> 10);
-    prescaler = 5; // prescaler: 1024
+    ///prescaler = 5; // prescaler: 1024
     actual_cycles = ceiling * 1024L;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1024 * 5 );
+    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
   } else {
     // Okay, that was slower than we actually go. Just set the slowest speed
     ///timer1 interrupt frequency = 15'625/(1+65535) = 0,238 Hz     (each 4,194304 sec)
-    ceiling = 0xffff;
-    prescaler = 5;
+    ///ceiling = 0xffff;
+    ///prescaler = 5;
+    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1024 * 5 );
+    TimerLoadSet( TIMER0_BASE, TIMER_A, 0xFFFF );
     actual_cycles = 0xffff * 1024;
   }
   // Set prescaler
