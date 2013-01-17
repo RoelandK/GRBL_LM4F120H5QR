@@ -3,7 +3,7 @@
   Part of Grbl
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
-  Copyright (c) 2011-2012 Sungeun K. Jeon  
+  Copyright (c) 2011-2012 Sungeun K. Jeon
 
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,8 +19,10 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+
 #include "protocol.h"
 #include "gcode.h"
 #include "serial.h"
@@ -36,21 +38,31 @@ static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
 static uint8_t char_counter; // Last character counter in line variable.
 static uint8_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
 
+void pinout_interrupt( void );
 
-void protocol_init() 
+void protocol_init()
 {
   char_counter = 0; // Reset line input
   iscomment = false;
-  report_init_message(); // Welcome message   
-  
-  PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
-  PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
-  PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
-  PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
+  report_init_message(); // Welcome message
+
+  ///PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
+  ///PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
+  ///PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
+  ///PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
+
+  SysCtlPeripheralEnable( PINOUT_SYSCTL_PERIPH ); ///Enable the GPIO module for PINOUT port
+  SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+
+  GPIOPinTypeGPIOInput( PINOUT_PORT, PINOUT_MASK ); // Set as input pins
+  GPIOPadConfigSet( PINOUT_PORT, PINOUT_MASK, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU); //Enable weak pull-ups
+  GPIOPortIntRegister( PINOUT_PORT, pinout_interrupt ); //register a call-back funcion for interrupt
+  GPIOIntTypeSet( PINOUT_PORT, PINOUT_MASK, GPIO_BOTH_EDGES ); // Enable specific pins of the Pin Change Interrupt
+  GPIOPinIntEnable( PINOUT_PORT, PINOUT_MASK ); // Enable Pin Change Interrupt
 }
 
 // Executes user startup script, if stored.
-void protocol_execute_startup() 
+void protocol_execute_startup()
 {
   uint8_t n;
   for (n=0; n < N_STARTUP_LINE; n++) {
@@ -61,25 +73,38 @@ void protocol_execute_startup()
         printString(line); // Echo startup line to indicate execution.
         report_status_message(gc_execute_line(line));
       }
-    } 
-  }  
+    }
+  }
 }
 
 // Pin change interrupt for pin-out commands, i.e. cycle start, feed hold, and reset. Sets
-// only the runtime command execute variable to have the main program execute these when 
+// only the runtime command execute variable to have the main program execute these when
 // its ready. This works exactly like the character-based runtime commands when picked off
 // directly from the incoming serial data stream.
-ISR(PINOUT_INT_vect) 
+///ISR(PINOUT_INT_vect)
+void pinout_interrupt( void )
 {
+  GPIOPinIntClear( PINOUT_PORT, PINOUT_MASK ); ///clear interrupt flag
+
   // Enter only if any pinout pin is actively low.
-  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) { 
+/*  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) {
     if (bit_isfalse(PINOUT_PIN,bit(PIN_RESET))) {
       mc_reset();
     } else if (bit_isfalse(PINOUT_PIN,bit(PIN_FEED_HOLD))) {
-      sys.execute |= EXEC_FEED_HOLD; 
+      sys.execute |= EXEC_FEED_HOLD;
     } else if (bit_isfalse(PINOUT_PIN,bit(PIN_CYCLE_START))) {
       sys.execute |= EXEC_CYCLE_START;
     }
+  }*/
+
+  if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_RESET ) ) {
+    mc_reset();
+
+  } else if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_FEED_HOLD ) ) {
+    sys.execute |= EXEC_FEED_HOLD;
+
+  } else if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_CYCLE_START ) ) {
+    sys.execute |= EXEC_CYCLE_START;
   }
 }
 
@@ -87,9 +112,9 @@ ISR(PINOUT_INT_vect)
 // program, primarily where there may be a while loop waiting for a buffer to clear space or any
 // point where the execution time from the last check point may be more than a fraction of a second.
 // This is a way to execute runtime commands asynchronously (aka multitasking) with grbl's g-code
-// parsing and planning functions. This function also serves as an interface for the interrupts to 
+// parsing and planning functions. This function also serves as an interface for the interrupts to
 // set the system runtime flags, where only the main program handles them, removing the need to
-// define more computationally-expensive volatile variables. This also provides a controlled way to 
+// define more computationally-expensive volatile variables. This also provides a controlled way to
 // execute certain tasks without having two or more instances of the same task, such as the planner
 // recalculating the buffer upon a feedhold or override.
 // NOTE: The sys.execute variable flags are set by any process, step or serial interrupts, pinouts,
@@ -98,19 +123,19 @@ void protocol_execute_runtime()
 {
   if (sys.execute) { // Enter only if any bit flag is true
     uint8_t rt_exec = sys.execute; // Avoid calling volatile multiple times
-    
+
     // System alarm. Everything has shutdown by something that has gone severely wrong. Report
     // the source of the error to the user. If critical, Grbl disables by entering an infinite
     // loop until system reset/abort.
-    if (rt_exec & (EXEC_ALARM | EXEC_CRIT_EVENT)) {      
+    if (rt_exec & (EXEC_ALARM | EXEC_CRIT_EVENT)) {
       sys.state = STATE_ALARM; // Set system alarm state
 
       // Critical event. Only hard limit qualifies. Update this as new critical events surface.
       if (rt_exec & EXEC_CRIT_EVENT) {
-        report_alarm_message(ALARM_HARD_LIMIT); 
+        report_alarm_message(ALARM_HARD_LIMIT);
         report_feedback_message(MESSAGE_CRITICAL_EVENT);
         bit_false(sys.execute,EXEC_RESET); // Disable any existing reset
-        do { 
+        do {
           // Nothing. Block EVERYTHING until user issues reset or power cycles. Hard limits
           // typically occur while unattended or not paying attention. Gives the user time
           // to do what is needed before resetting, like killing the incoming stream.
@@ -124,34 +149,34 @@ void protocol_execute_runtime()
         report_alarm_message(ALARM_ABORT_CYCLE);
       }
       bit_false(sys.execute,(EXEC_ALARM | EXEC_CRIT_EVENT));
-    } 
-  
-    // Execute system abort. 
+    }
+
+    // Execute system abort.
     if (rt_exec & EXEC_RESET) {
       sys.abort = true;  // Only place this is set true.
       return; // Nothing else to do but exit.
     }
-    
+
     // Execute and serial print status
-    if (rt_exec & EXEC_STATUS_REPORT) { 
+    if (rt_exec & EXEC_STATUS_REPORT) {
       report_realtime_status();
       bit_false(sys.execute,EXEC_STATUS_REPORT);
     }
-    
+
     // Initiate stepper feed hold
     if (rt_exec & EXEC_FEED_HOLD) {
       st_feed_hold(); // Initiate feed hold.
       bit_false(sys.execute,EXEC_FEED_HOLD);
     }
-    
+
     // Reinitializes the stepper module running state and, if a feed hold, re-plans the buffer.
     // NOTE: EXEC_CYCLE_STOP is set by the stepper subsystem when a cycle or feed hold completes.
     if (rt_exec & EXEC_CYCLE_STOP) {
       st_cycle_reinitialize();
       bit_false(sys.execute,EXEC_CYCLE_STOP);
     }
-    
-    if (rt_exec & EXEC_CYCLE_START) { 
+
+    if (rt_exec & EXEC_CYCLE_START) {
       st_cycle_start(); // Issue cycle start command to stepper subsystem
       if (bit_istrue(settings.flags,BITFLAG_AUTO_START)) {
         sys.auto_start = true; // Re-enable auto start after feed hold.
@@ -159,26 +184,26 @@ void protocol_execute_runtime()
       bit_false(sys.execute,EXEC_CYCLE_START);
     }
   }
-  
-  // Overrides flag byte (sys.override) and execution should be installed here, since they 
+
+  // Overrides flag byte (sys.override) and execution should be installed here, since they
   // are runtime and require a direct and controlled interface to the main stepper program.
-}  
+}
 
 
 // Directs and executes one line of formatted input from protocol_process. While mostly
-// incoming streaming g-code blocks, this also executes Grbl internal commands, such as 
+// incoming streaming g-code blocks, this also executes Grbl internal commands, such as
 // settings, initiating the homing cycle, and toggling switch states. This differs from
-// the runtime command module by being susceptible to when Grbl is ready to execute the 
+// the runtime command module by being susceptible to when Grbl is ready to execute the
 // next line during a cycle, so for switches like block delete, the switch only effects
-// the lines that are processed afterward, not necessarily real-time during a cycle, 
+// the lines that are processed afterward, not necessarily real-time during a cycle,
 // since there are motions already stored in the buffer. However, this 'lag' should not
 // be an issue, since these commands are not typically used during a cycle.
-uint8_t protocol_execute_line(char *line) 
-{   
-  // Grbl internal command and parameter lines are of the form '$4=374.3' or '$' for help  
+uint8_t protocol_execute_line(char *line)
+{
+  // Grbl internal command and parameter lines are of the form '$4=374.3' or '$' for help
   if(line[0] == '$') {
-    
-    uint8_t char_counter = 1; 
+
+    uint8_t char_counter = 1;
     uint8_t helper_var = 0; // Helper variable
     float parameter, value;
     switch( line[char_counter] ) {
@@ -200,45 +225,45 @@ uint8_t protocol_execute_line(char *line)
         // Perform reset when toggling off. Check g-code mode should only work if Grbl
         // is idle and ready, regardless of alarm locks. This is mainly to keep things
         // simple and consistent.
-        if ( sys.state == STATE_CHECK_MODE ) { 
-          mc_reset(); 
+        if ( sys.state == STATE_CHECK_MODE ) {
+          mc_reset();
           report_feedback_message(MESSAGE_DISABLED);
         } else {
           if (sys.state) { return(STATUS_IDLE_ERROR); }
           sys.state = STATE_CHECK_MODE;
           report_feedback_message(MESSAGE_ENABLED);
         }
-        break; 
+        break;
       case 'X' : // Disable alarm lock
         if ( line[++char_counter] != 0 ) { return(STATUS_UNSUPPORTED_STATEMENT); }
-        if (sys.state == STATE_ALARM) { 
+        if (sys.state == STATE_ALARM) {
           report_feedback_message(MESSAGE_ALARM_UNLOCK);
           sys.state = STATE_IDLE;
           // Don't run startup script. Prevents stored moves in startup from causing accidents.
         }
-        break;               
+        break;
       case 'H' : // Perform homing cycle
-        if (bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE)) { 
+        if (bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE)) {
           // Only perform homing if Grbl is idle or lost.
-          if ( sys.state==STATE_IDLE || sys.state==STATE_ALARM ) { 
-            mc_go_home(); 
+          if ( sys.state==STATE_IDLE || sys.state==STATE_ALARM ) {
+            mc_go_home();
             if (!sys.abort) { protocol_execute_startup(); } // Execute startup scripts after successful homing.
           } else { return(STATUS_IDLE_ERROR); }
         } else { return(STATUS_SETTING_DISABLED); }
         break;
 //    case 'J' : break;  // Jogging methods
-      // TODO: Here jogging can be placed for execution as a seperate subprogram. It does not need to be 
+      // TODO: Here jogging can be placed for execution as a seperate subprogram. It does not need to be
       // susceptible to other runtime commands except for e-stop. The jogging function is intended to
-      // be a basic toggle on/off with controlled acceleration and deceleration to prevent skipped 
+      // be a basic toggle on/off with controlled acceleration and deceleration to prevent skipped
       // steps. The user would supply the desired feedrate, axis to move, and direction. Toggle on would
       // start motion and toggle off would initiate a deceleration to stop. One could 'feather' the
-      // motion by repeatedly toggling to slow the motion to the desired location. Location data would 
+      // motion by repeatedly toggling to slow the motion to the desired location. Location data would
       // need to be updated real-time and supplied to the user through status queries.
-      //   More controlled exact motions can be taken care of by inputting G0 or G1 commands, which are 
+      //   More controlled exact motions can be taken care of by inputting G0 or G1 commands, which are
       // handled by the planner. It would be possible for the jog subprogram to insert blocks into the
-      // block buffer without having the planner plan them. It would need to manage de/ac-celerations 
+      // block buffer without having the planner plan them. It would need to manage de/ac-celerations
       // on its own carefully. This approach could be effective and possibly size/memory efficient.
-      case 'N' : // Startup lines. 
+      case 'N' : // Startup lines.
         if ( line[++char_counter] == 0 ) { // Print startup lines
           for (helper_var=0; helper_var < N_STARTUP_LINE; helper_var++) {
             if (!(settings_read_startup_line(helper_var, line))) {
@@ -249,7 +274,7 @@ uint8_t protocol_execute_line(char *line)
           }
           break;
         } else { // Store startup line
-          helper_var = true;  // Set helper_var to flag storing method. 
+          helper_var = true;  // Set helper_var to flag storing method.
           // No break. Continues into default: to read remaining command characters.
         }
       default :  // Storing setting methods
@@ -264,7 +289,7 @@ uint8_t protocol_execute_line(char *line)
           // Execute gcode block to ensure block is valid.
           helper_var = gc_execute_line(line); // Set helper_var to returned status code.
           if (helper_var) { return(helper_var); }
-          else { 
+          else {
             helper_var = trunc(parameter); // Set helper_var to int value of parameter
             settings_store_startup_line(helper_var,line);
           }
@@ -294,18 +319,18 @@ void protocol_process()
       // NOTE: If there is no line, this function should quickly return to the main program when
       // the buffer empties of non-executable data.
       protocol_execute_runtime();
-      if (sys.abort) { return; } // Bail to main program upon system abort    
+      if (sys.abort) { return; } // Bail to main program upon system abort
 
       if (char_counter > 0) {// Line is complete. Then execute!
         line[char_counter] = 0; // Terminate string
         report_status_message(protocol_execute_line(line));
-      } else { 
+      } else {
         // Empty or comment line. Skip block.
         report_status_message(STATUS_OK); // Send status message for syncing purposes.
       }
       char_counter = 0; // Reset line buffer index
       iscomment = false; // Reset comment flag
-      
+
     } else {
       if (iscomment) {
         // Throw away all comment characters
@@ -314,15 +339,15 @@ void protocol_process()
           iscomment = false;
         }
       } else {
-        if (c <= ' ') { 
+        if (c <= ' ') {
           // Throw away whitepace and control characters
-        } else if (c == '/') { 
+        } else if (c == '/') {
           // Block delete not supported. Ignore character.
         } else if (c == '(') {
           // Enable comments flag and ignore all characters until ')' or EOL.
           iscomment = true;
         } else if (char_counter >= LINE_BUFFER_SIZE-1) {
-          // Throw away any characters beyond the end of the line buffer          
+          // Throw away any characters beyond the end of the line buffer
         } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
           line[char_counter++] = c-'a'+'A';
         } else {

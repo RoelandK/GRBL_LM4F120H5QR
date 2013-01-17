@@ -19,7 +19,8 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-//#include <util/delay.h>
+#include "driverlib/sysctl.h"
+
 #include "nuts_bolts.h"
 #include "gcode.h"
 #include "planner.h"
@@ -124,7 +125,7 @@ void delay_ms(uint16_t ms)
 // efficiently with larger delays, as the counter adds parasitic time in each iteration.
 void delay_us(uint32_t us)
 {
-  SysCtlDelay( F_CPU / 3000000 * ms );
+  SysCtlDelay( F_CPU / 3000000 * us );
 /*
   while (us) {
     if (us < 10) {

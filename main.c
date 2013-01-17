@@ -23,23 +23,22 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#define F_CPU 80000000 // 80 MHz
 #include "inc/hw_types.h"
 #include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
+//#include "driverlib/gpio.h"
 #include "driverlib/fpu.h"
 
 #include "config.h"
 #include "planner.h"
 #include "nuts_bolts.h"
 #include "stepper.h"
-//#include "spindle_control.h"
-//#include "coolant_control.h"
-//#include "motion_control.h"
-//#include "gcode.h"
-//#include "protocol.h"
-//#include "limits.h"
-//#include "report.h"
+#include "spindle_control.h"
+#include "coolant_control.h"
+#include "motion_control.h"
+#include "gcode.h"
+#include "protocol.h"
+#include "limits.h"
+#include "report.h"
 //#include "settings.h"
 //#include "serial.h"
 
@@ -112,5 +111,5 @@ int main(void)
     protocol_process(); // ... process the serial protocol
 
   }
-  return 0;   /* never reached */
+  ///return 0;   /* never reached */
 }

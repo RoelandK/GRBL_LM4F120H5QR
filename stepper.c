@@ -23,10 +23,14 @@
    and Philipp Tiefenbacher. */
 
 ///#include <avr/interrupt.h>
+//#include "inc/hw_gpio.h"
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
 #include "inc/hw_ints.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/timer.h"
+#include "driverlib/gpio.h"
 
 #include "stepper.h"
 #include "config.h"
@@ -35,7 +39,8 @@
 
 // Some useful constants
 #define TICKS_PER_MICROSECOND (F_CPU/1000000)
-#define CYCLES_PER_ACCELERATION_TICK (F_CPU/ACCELERATION_TICKS_PER_SECOND)
+///#define CYCLES_PER_ACCELERATION_TICK (F_CPU/ACCELERATION_TICKS_PER_SECOND)
+#define CYCLES_PER_ACCELERATION_TICK ((TICKS_PER_MICROSECOND*1000000)/ACCELERATION_TICKS_PER_SECOND)
 
 // Stepper state variable. Contains running data and trapezoid variables.
 typedef struct {
@@ -58,7 +63,8 @@ static stepper_t st;
 static block_t *current_block;  // A pointer to the block currently being traced
 
 // Used by the stepper driver interrupt
-static uint8_t step_pulse_time; // Step pulse reset time after step rise
+///static uint8_t step_pulse_time; // Step pulse reset time after step rise
+static uint32_t step_pulse_time; // Step pulse reset time after step rise
 static uint8_t out_bits;        // The next stepping-bits to be output
 static volatile uint8_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
 
@@ -106,12 +112,14 @@ void st_wake_up()
       step_pulse_time = -(((settings.pulse_microseconds+STEP_PULSE_DELAY-2)*TICKS_PER_MICROSECOND) >> 3);
       // Set delay between direction pin write and step command.
 ///todo      OCR2A = -(((settings.pulse_microseconds)*TICKS_PER_MICROSECOND) >> 3);
+///      TimerLoadSet( TIMER0_BASE, TIMER_B, (((settings.pulse_microseconds)*TICKS_PER_MICROSECOND) >> 3) );
     #else // Normal operation
       // Set step pulse time. Ad hoc computation from oscilloscope. Uses two's complement.
       step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
     #endif
     // Enable stepper driver interrupt
-///todo    TIMSK1 |= (1<<OCIE1A);
+    ///TIMSK1 |= (1<<OCIE1A);
+    TimerEnable( TIMER0_BASE, TIMER_A );
   }
 }
 
@@ -119,7 +127,12 @@ void st_wake_up()
 void st_go_idle()
 {
   // Disable stepper driver interrupt
-///todo  TIMSK1 &= ~(1<<OCIE1A); ///Disable bit 'Timer/Counter1, Output Compare A Match Interrupt Enable' in interrupt mask register
+  ///TIMSK1 &= ~(1<<OCIE1A); ///Disable bit 'Timer/Counter1, Output Compare A Match Interrupt Enable' in interrupt mask register
+  /// If we disable interrupt, the timer will continue to work. When you will switch on it again, what value will it have?
+  ///Maybe it is better to disconnect the clock source?
+  TimerDisable( TIMER0_BASE, TIMER_A );
+  /// No function to write value into the timer, though the timer supports this! Texas Instruments, are you crazy?
+  HWREG( TIMER0_BASE + 0x0050 ) = (uint32_t) 0;
   // Disable steppers only upon system alarm activated or by user setting to not be kept enabled.
   if ((settings.stepper_idle_lock_time != 0xff) || bit_istrue(sys.execute,EXEC_ALARM)) {
     // Force stepper dwell to lock axes for a defined amount of time to ensure the axes come to a complete
@@ -154,12 +167,14 @@ inline static uint8_t iterate_trapezoid_cycle_counter()
 // It is supported by The Stepper Port Reset Interrupt which it uses to reset the stepper port after each pulse.
 // The bresenham line tracer algorithm controls all three stepper outputs simultaneously with these two interrupts.
 ///ISR(TIMER1_COMPA_vect)
-void timer1_compare_interrupt( void ) //todo
+void timer1_compare_interrupt( void )
 {
+  TimerIntClear( TIMER0_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
+
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
 
   // Set the direction pins a couple of nanoseconds before we step the steppers
-///  STEPPING_PORT = (STEPPING_PORT & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
+  ///STEPPING_PORT = (STEPPING_PORT & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
   GPIOPinWrite( STEPPING_PORT, DIRECTION_MASK, out_bits );
   // Then pulse the stepping pins
   #ifdef STEP_PULSE_DELAY
@@ -170,14 +185,18 @@ void timer1_compare_interrupt( void ) //todo
   #endif
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly 'settings.pulse_microseconds' microseconds, independent of the main Timer1 prescaler.
-///todo  TCNT2 = step_pulse_time; // Reload timer counter
-///todo  TCCR2B = (1<<CS21); // Begin timer2. Full speed, 1/8 prescaler
+  ///TCNT2 = step_pulse_time; // Reload timer counter
+  HWREG( TIMER0_BASE + 0x54 ) = step_pulse_time;
+  ///TCCR2B = (1<<CS21); // Begin timer2. Full speed, 1/8 prescaler
+  TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
+  TimerEnable( TIMER0_BASE, TIMER_B );
 
   busy = true;
   // Re-enable interrupts to allow ISR_TIMER2_OVERFLOW to trigger on-time and allow serial communications
   // regardless of time in this handler. The following code prepares the stepper driver for the next
   // step interrupt compare and will always finish before returning to the main program.
-///todo  sei();
+  ///sei();
+  IntMasterEnable();
 
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
@@ -331,12 +350,16 @@ void timer1_compare_interrupt( void ) //todo
 // cause issues at high step rates if another high frequency asynchronous interrupt is
 // added to Grbl.
 ///ISR(TIMER2_OVF_vect)
-void timer2_overflow_interrupt( void ) //todo
+void timer2_overflow_interrupt( void )
 {
+  TimerIntClear( TIMER0_BASE, TIMER_TIMB_TIMEOUT ); /// clear interrupt flag
+
   // Reset stepping pins (leave the direction pins)
-///  STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (settings.invert_mask & STEP_MASK);
+  ///STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (settings.invert_mask & STEP_MASK);
   GPIOPinWrite( STEPPING_PORT, STEP_MASK, settings.invert_mask );
-///todo  TCCR2B = 0; // Disable Timer2 to prevent re-entering this interrupt when it's not needed.
+  ///TCCR2B = 0; // Disable Timer2 to prevent re-entering this interrupt when it's not needed.
+  TimerDisable( TIMER0_BASE, TIMER_B );
+  HWREG( TIMER0_BASE + 0x054 ) = (uint32_t) 0;
 }
 
 #ifdef STEP_PULSE_DELAY
@@ -368,14 +391,15 @@ void st_init()
   // Configure directions of interface pins
 ///  STEPPING_DDR |= STEPPING_MASK;
   SysCtlPeripheralEnable( STEPPING_SYSCTL_PERIPH );
+  SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
   GPIOPinTypeGPIOOutput( STEPPING_PORT, STEPPING_MASK );
 ///  STEPPING_PORT = (STEPPING_PORT & ~STEPPING_MASK) | settings.invert_mask;
   GPIOPinWrite( STEPPING_PORT, STEPPING_MASK, settings.invert_mask );
 ///  STEPPERS_DISABLE_DDR |= 1<<STEPPERS_DISABLE_BIT;
   SysCtlPeripheralEnable( STEPPERS_DISABLE_SYSCTL_PERIPH );
-  GPIOPinTypeGPIOOutput( STEPPERS_DISABLE_PORT, 1<<STEPPERS_DISABLE_BIT );
+  GPIOPinTypeGPIOOutput( STEPPERS_DISABLE_PORT, (1<<STEPPERS_DISABLE_BIT) );
 
-/* todo
+/*
   // waveform generation = 0100 = CTC
   /// Timer1 (16 bit) mode:
   /// CTC - Clear Timer on Compare
@@ -405,8 +429,8 @@ void st_init()
   #endif
 */
   /// Configure TIMER0 to work as two separate 16-bit timers TIMER_A and TIMER_B
-  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 ); ///todo
-  ///todo delay_ms(1); ///give some time for timer module to start
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 );
+  SysCtlDelay(26); ///give time delay 1 microsecond for timer module to start
   TimerConfigure( TIMER0_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP | TIMER_CFG_B_PERIODIC_UP );
   /// TIMER_A will act as 16-bit Timer1 in AVR
   /// TIMER_B will act as 8-bit Timer2 in AVR
@@ -418,6 +442,8 @@ void st_init()
   ///Register iterrupt handlers for timers
   TimerIntRegister( TIMER0_BASE, TIMER_A, timer1_compare_interrupt );
   TimerIntRegister( TIMER0_BASE, TIMER_B, timer2_overflow_interrupt );
+  TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+  TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);
 
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
   st_wake_up();
@@ -429,7 +455,7 @@ void st_init()
 static uint32_t config_step_timer(uint32_t cycles)
 {
   uint16_t ceiling;
-  uint8_t prescaler;
+  ///uint8_t prescaler;
   uint32_t actual_cycles;
   if (cycles <= 0xffffL) {
     ///timer1 interrupt frequency = 16'000'000/(1+cycles) = 16 MHz ... 244 Hz
@@ -476,16 +502,17 @@ static uint32_t config_step_timer(uint32_t cycles)
     actual_cycles = 0xffff * 1024;
   }
   // Set prescaler
-///todo  TCCR1B = (TCCR1B & ~(0x07<<CS10)) | (prescaler<<CS10);
+  ///TCCR1B = (TCCR1B & ~(0x07<<CS10)) | (prescaler<<CS10);
   // Set ceiling
-///todo  OCR1A = ceiling;
+  ///OCR1A = ceiling;
   return(actual_cycles);
 }
 
 static void set_step_events_per_minute(uint32_t steps_per_minute)
 {
   if (steps_per_minute < MINIMUM_STEPS_PER_MINUTE) { steps_per_minute = MINIMUM_STEPS_PER_MINUTE; }
-  st.cycles_per_step_event = config_step_timer((F_CPU*60)/steps_per_minute);
+  st.cycles_per_step_event = config_step_timer((TICKS_PER_MICROSECOND*1000000*60)/steps_per_minute);
+  ///st.cycles_per_step_event = config_step_timer((F_CPU*60)/steps_per_minute);
 }
 
 // Planner external interface to start stepper interrupt and execute the blocks in queue. Called
