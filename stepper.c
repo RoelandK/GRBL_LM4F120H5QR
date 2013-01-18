@@ -38,9 +38,9 @@
 #include "planner.h"
 
 // Some useful constants
-#define TICKS_PER_MICROSECOND (F_CPU/1000000)
+#define TICKS_PER_MICROSECOND (F_CPU/1000000) ///16 on avr, 80 on arm
 ///#define CYCLES_PER_ACCELERATION_TICK (F_CPU/ACCELERATION_TICKS_PER_SECOND)
-#define CYCLES_PER_ACCELERATION_TICK ((TICKS_PER_MICROSECOND*1000000)/ACCELERATION_TICKS_PER_SECOND)
+#define CYCLES_PER_ACCELERATION_TICK ((TICKS_PER_MICROSECOND*1000000)/ACCELERATION_TICKS_PER_SECOND) ///320000 on AVR, same on ARM
 
 // Stepper state variable. Contains running data and trapezoid variables.
 typedef struct {
@@ -511,8 +511,8 @@ static uint32_t config_step_timer(uint32_t cycles)
 static void set_step_events_per_minute(uint32_t steps_per_minute)
 {
   if (steps_per_minute < MINIMUM_STEPS_PER_MINUTE) { steps_per_minute = MINIMUM_STEPS_PER_MINUTE; }
-  st.cycles_per_step_event = config_step_timer((TICKS_PER_MICROSECOND*1000000*60)/steps_per_minute);
-  ///st.cycles_per_step_event = config_step_timer((F_CPU*60)/steps_per_minute);
+  ///st.cycles_per_step_event = config_step_timer((TICKS_PER_MICROSECOND*1000000*60)/steps_per_minute);
+  st.cycles_per_step_event = config_step_timer((F_CPU/steps_per_minute)*60); ///avoid values more than 4 billion...
 }
 
 // Planner external interface to start stepper interrupt and execute the blocks in queue. Called
