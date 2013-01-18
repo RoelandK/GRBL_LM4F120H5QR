@@ -57,23 +57,23 @@
 // Global persistent settings (Stored from byte EEPROM_ADDR_GLOBAL onwards)
 typedef struct {
   float steps_per_mm[3];
-  uint8_t microsteps;
-  uint8_t pulse_microseconds;
+  uint32_t microsteps;
+  uint32_t pulse_microseconds;
   float default_feed_rate;
   float default_seek_rate;
-  uint8_t invert_mask;
+  uint32_t invert_mask;
   float mm_per_arc_segment;
   float acceleration;
   float junction_deviation;
-  uint8_t flags;  // Contains default boolean settings
-  uint8_t homing_dir_mask;
+  uint32_t flags;  // Contains default boolean settings
+  uint32_t homing_dir_mask;
   float homing_feed_rate;
   float homing_seek_rate;
-  uint16_t homing_debounce_delay;
+  uint32_t homing_debounce_delay;
   float homing_pulloff;
-  uint8_t stepper_idle_lock_time; // If max value 255, steppers do not disable.
-  uint8_t decimal_places;
-  uint8_t n_arc_correction;
+  uint32_t stepper_idle_lock_time; // If max value 255, steppers do not disable.
+  uint32_t decimal_places;
+  uint32_t n_arc_correction;
 //  uint8_t status_report_mask; // Mask to indicate desired report data.
 } settings_t;
 extern settings_t settings;
