@@ -30,8 +30,10 @@
 // memory space we can invest into here or we re-write the g-code parser not to have his
 // buffer.
 #ifndef LINE_BUFFER_SIZE
-  #define LINE_BUFFER_SIZE 256
+  #define LINE_BUFFER_SIZE 256 /// must be a multiple of 4 for ARM (because of EEPROM limitations...)
 #endif
+
+#include <stdint.h>
 
 // Initialize the serial protocol
 void protocol_init();

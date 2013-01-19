@@ -23,10 +23,21 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
+#ifndef UART_BUFFERED
+  #define UART_BUFFERED
+#endif
+
+#ifndef PART_LM4F120H5QR
+  #define PART_LM4F120H5QR
+#endif
+
 #include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/pin_map.h"
 #include "driverlib/sysctl.h"
-//#include "driverlib/gpio.h"
+#include "driverlib/gpio.h"
 #include "driverlib/fpu.h"
+#include "utils/uartstdio.h"
 
 #include "config.h"
 #include "planner.h"
@@ -39,8 +50,7 @@
 #include "protocol.h"
 #include "limits.h"
 #include "report.h"
-//#include "settings.h"
-//#include "serial.h"
+#include "settings.h"
 
 // Declare system global variable structure
 system_t sys;
@@ -51,8 +61,14 @@ int main(void)
 	FPUEnable(); //enable the Floating Point Unit
 	FPUStackingEnable(); // Enable stacking for interrupt handlers
 
+  // Enable and Initialize the UART.
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA );
+  GPIOPinConfigure( GPIO_PA0_U0RX );
+  GPIOPinConfigure( GPIO_PA1_U0TX );
+  GPIOPinTypeUART( GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1 );
+  UARTStdioInit( 0 );
+
   // Initialize system
-  serial_init(); // Setup serial baud rate and interrupts
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
 //  sei(); // Enable interrupts
@@ -68,7 +84,10 @@ int main(void)
     // reset to finish the initialization process.
     if (sys.abort) {
       // Reset system.
-      serial_reset_read_buffer(); // Clear serial read buffer
+      ///serial_reset_read_buffer(); // Clear serial read buffer
+      UARTFlushRx();
+      UARTFlushTx( true );
+
       plan_init(); // Clear block buffer and planner variables
       gc_init(); // Set g-code parser to default state
       protocol_init(); // Clear incoming line data and execute startup lines

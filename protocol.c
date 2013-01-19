@@ -19,13 +19,17 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef UART_BUFFERED
+  #define UART_BUFFERED
+#endif
+
+#include "utils/uartstdio.h"
 #include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
 
 #include "protocol.h"
 #include "gcode.h"
-#include "serial.h"
 #include "print.h"
 #include "settings.h"
 #include "config.h"
@@ -70,7 +74,8 @@ void protocol_execute_startup()
       report_status_message(STATUS_SETTING_READ_FAIL);
     } else {
       if (line[0] != 0) {
-        printString(line); // Echo startup line to indicate execution.
+        ///printString(line); // Echo startup line to indicate execution.
+        UARTprintf( line );
         report_status_message(gc_execute_line(line));
       }
     }
@@ -312,7 +317,10 @@ uint8_t protocol_execute_line(char *line)
 void protocol_process()
 {
   uint8_t c;
-  while((c = serial_read()) != SERIAL_NO_DATA) {
+  //while((c = serial_read()) != SERIAL_NO_DATA) {
+  while( UARTRxBytesAvail() ) {
+    c = UARTgetc();
+
     if ((c == '\n') || (c == '\r')) { // End of line reached
 
       // Runtime command check point before executing line. Prevent any furthur line executions.

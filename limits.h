@@ -19,7 +19,7 @@
 */
 
 #ifndef limits_h
-#define limits_h 
+#define limits_h
 
 // initialize the limits module
 void limits_init();
