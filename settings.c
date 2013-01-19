@@ -19,7 +19,9 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
+#include "driverlib/sysctl.h"
+#include "driverlib/eeprom.h"
+
 #include "protocol.h"
 #include "report.h"
 #include "stepper.h"
@@ -30,39 +32,33 @@
 
 settings_t settings;
 
-// Version 4 outdated settings record
-typedef struct {
-  float steps_per_mm[3];
-  uint8_t microsteps;
-  uint8_t pulse_microseconds;
-  float default_feed_rate;
-  float default_seek_rate;
-  uint8_t invert_mask;
-  float mm_per_arc_segment;
-  float acceleration;
-  float junction_deviation;
-} settings_v4_t;
-
-
 // Method to store startup lines into EEPROM
 void settings_store_startup_line(uint8_t n, char *line)
 {
-  uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  ///uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
+  ///memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  
+  EEPROMProgram( line, EEPROM_ADDR_STARTUP_BLOCK, LINE_BUFFER_SIZE );
 }
 
 // Method to store coord data parameters into EEPROM
 void settings_write_coord_data(uint8_t coord_select, float *coord_data)
-{  
-  uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
-}  
+{
+  ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  uint32_t addr = ((uint32_t) coord_select)*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  ///memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
+  
+  EEPROMProgram( (uint32_t *) coord_data, addr, sizeof(float)*N_AXIS );
+}
 
 // Method to store Grbl global settings struct and version number into EEPROM
 void write_global_settings() 
 {
-  eeprom_put_char(0, SETTINGS_VERSION);
-  memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
+  ///todo eeprom_put_char(0, SETTINGS_VERSION);
+  ///memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
+  uint32_t v = SETTINGS_VERSION;
+  EEPROMProgram( &v, 0, 4 );
+  EEPROMProgram( (uint32_t *) &settings, EEPROM_ADDR_GLOBAL, sizeof( settings_t )  );
 }
 
 // Method to reset Grbl global settings back to defaults. 
@@ -101,7 +97,7 @@ void settings_reset(bool reset_all) {
 // Reads startup line from EEPROM. Updated pointed line string data.
 uint8_t settings_read_startup_line(uint8_t n, char *line)
 {
-  uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
+  uint32_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
   if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
     // Reset line with default value
     line[0] = 0;
@@ -204,6 +200,10 @@ uint8_t settings_store_global_setting(int parameter, float value) {
 
 // Initialize the config subsystem
 void settings_init() {
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
+  SysCtlDelay( 26 ); ///delay gives the module some time to start
+  EEPROMInit();
+  
   if(!read_global_settings()) {
     report_status_message(STATUS_SETTING_READ_FAIL);
     settings_reset(true);
