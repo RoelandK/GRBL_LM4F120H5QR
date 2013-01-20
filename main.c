@@ -33,11 +33,13 @@
 
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
+#include "inc/hw_ints.h"
 #include "driverlib/pin_map.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
 #include "driverlib/fpu.h"
-#include "utils/uartstdio.h"
+#include "driverlib/interrupt.h"
+#include "uartstdio.h"
 
 #include "config.h"
 #include "planner.h"
@@ -71,7 +73,8 @@ int main(void)
   // Initialize system
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
-//  sei(); // Enable interrupts
+  ///sei(); // Enable interrupts
+  IntMasterEnable();
 
   memset(&sys, 0, sizeof(sys));  // Clear all system variables
   sys.abort = true;   // Set abort to complete initialization
@@ -85,8 +88,8 @@ int main(void)
     if (sys.abort) {
       // Reset system.
       ///serial_reset_read_buffer(); // Clear serial read buffer
-      UARTFlushRx();
-      UARTFlushTx( true );
+      ///UARTFlushRx();
+      ///UARTFlushTx( true );
 
       plan_init(); // Clear block buffer and planner variables
       gc_init(); // Set g-code parser to default state

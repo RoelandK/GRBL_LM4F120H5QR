@@ -20,6 +20,7 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "inc/hw_types.h"
 #include "driverlib/gpio.h"
 #include "inc/hw_memmap.h"
 

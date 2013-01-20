@@ -37,27 +37,27 @@
 #define STEPPING_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
 #define STEPPING_DDR       DDRD
 #define STEPPING_PORT      GPIO_PORTF_BASE //PORTD for AVR, GPIO_PORTF_BASE for Cortex
-#define X_STEP_BIT         2  // Uno Digital Pin 2
-#define Y_STEP_BIT         3  // Uno Digital Pin 3
-#define Z_STEP_BIT         4  // Uno Digital Pin 4
+#define X_STEP_BIT         1  // Uno Digital Pin 2
+#define Y_STEP_BIT         2  // Uno Digital Pin 3
+#define Z_STEP_BIT         3  // Uno Digital Pin 4
 #define X_DIRECTION_BIT    5  // Uno Digital Pin 5
-#define Y_DIRECTION_BIT    6  // Uno Digital Pin 6
-#define Z_DIRECTION_BIT    7  // Uno Digital Pin 7
+#define Y_DIRECTION_BIT    5  // Uno Digital Pin 6
+#define Z_DIRECTION_BIT    5  // Uno Digital Pin 7
 #define STEP_MASK ((1<<X_STEP_BIT)|(1<<Y_STEP_BIT)|(1<<Z_STEP_BIT)) // All step bits
 #define DIRECTION_MASK ((1<<X_DIRECTION_BIT)|(1<<Y_DIRECTION_BIT)|(1<<Z_DIRECTION_BIT)) // All direction bits
 #define STEPPING_MASK (STEP_MASK | DIRECTION_MASK) // All stepping-related bits (step/direction)
 
-#define STEPPERS_DISABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
-#define STEPPERS_DISABLE_DDR    DDRB
-#define STEPPERS_DISABLE_PORT   GPIO_PORTB_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
+#define STEPPERS_DISABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define STEPPERS_DISABLE_DDR    DDRE
+#define STEPPERS_DISABLE_PORT   GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define STEPPERS_DISABLE_BIT    0  // Uno Digital Pin 8
 #define STEPPERS_DISABLE_MASK (1<<STEPPERS_DISABLE_BIT)
 
 // NOTE: All limit bit pins must be on the same port
-#define LIMIT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
-#define LIMIT_DDR       DDRB
+#define LIMIT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define LIMIT_DDR       DDRE
 ///#define LIMIT_PIN       PINB ///don't have this in ARM
-#define LIMIT_PORT      GPIO_PORTB_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
+#define LIMIT_PORT      GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define X_LIMIT_BIT     1  // Uno Digital Pin 9
 #define Y_LIMIT_BIT     2  // Uno Digital Pin 10
 #define Z_LIMIT_BIT     3  // Uno Digital Pin 11
@@ -68,20 +68,20 @@
 ///#define LIMIT_INT_vect  PCINT0_vect
 ///#define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
 
-#define SPINDLE_ENABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
-#define SPINDLE_ENABLE_DDR   DDRB
-#define SPINDLE_ENABLE_PORT  GPIO_PORTB_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
+#define SPINDLE_ENABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_ENABLE_DDR   DDRE
+#define SPINDLE_ENABLE_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_ENABLE_BIT   4  // Uno Digital Pin 12
 
-#define SPINDLE_DIRECTION_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOB //defined for Cortex M4F
-#define SPINDLE_DIRECTION_DDR   DDRB
-#define SPINDLE_DIRECTION_PORT  GPIO_PORTB_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
+#define SPINDLE_DIRECTION_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_DIRECTION_DDR   DDRE
+#define SPINDLE_DIRECTION_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_DIRECTION_BIT   5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
 
-#define COOLANT_FLOOD_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
-#define COOLANT_FLOOD_DDR   DDRC
-#define COOLANT_FLOOD_PORT  GPIO_PORTC_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
-#define COOLANT_FLOOD_BIT   3  // Uno Analog Pin 3
+#define COOLANT_FLOOD_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define COOLANT_FLOOD_DDR   DDRE
+#define COOLANT_FLOOD_PORT  GPIO_PORTE_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
+#define COOLANT_FLOOD_BIT   6  // Uno Analog Pin 3
 
 // NOTE: Uno analog pins 4 and 5 are reserved for an i2c interface, and may be installed at
 // a later date if flash and memory space allows.
@@ -94,13 +94,13 @@
 #endif
 
 // NOTE: All pinouts pins must be on the same port
-#define PINOUT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
-#define PINOUT_DDR       DDRC
+#define PINOUT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define PINOUT_DDR       DDRF
 ///#define PINOUT_PIN       PINC /// don't have this in ARM
-#define PINOUT_PORT      GPIO_PORTC_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
-#define PIN_RESET        0  // Uno Analog Pin 0
-#define PIN_FEED_HOLD    1  // Uno Analog Pin 1
-#define PIN_CYCLE_START  2  // Uno Analog Pin 2
+#define PINOUT_PORT      GPIO_PORTF_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
+#define PIN_RESET        6  // Uno Analog Pin 0
+#define PIN_FEED_HOLD    4  // Uno Analog Pin 1
+#define PIN_CYCLE_START  0  // Uno Analog Pin 2
 #define PINOUT_MASK ((1<<PIN_RESET)|(1<<PIN_FEED_HOLD)|(1<<PIN_CYCLE_START))
 
 // Config for interrupt on pin change (pins for reset, feed hold and cycle start buttons)

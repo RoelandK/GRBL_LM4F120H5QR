@@ -26,7 +26,9 @@
   methods to accomodate their needs.
 */
 
-#include "utils/uartstdio.h"
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "uartstdio.h"
 
 #include "report.h"
 #include "print.h"
@@ -127,7 +129,7 @@ void report_init_message()
 
 // Grbl help message
 void report_grbl_help() {
-  UARTprintf("$$ (view Grbl settings)\r\n"
+/*  UARTprintf("$$ (view Grbl settings)\r\n"
                       "$# (view # parameters)\r\n"
                       "$G (view parser state)\r\n"
                       "$N (view startup blocks)\r\n"
@@ -139,7 +141,21 @@ void report_grbl_help() {
                       "~ (cycle start)\r\n"
                       "! (feed hold)\r\n"
                       "? (current status)\r\n"
-                      "ctrl-x (reset Grbl)\r\n");
+                      "ctrl-x (reset Grbl)\r\n");*/
+
+  UARTprintf( "$$ (view Grbl settings)\r\n" );
+  UARTprintf( "$# (view # parameters)\r\n" );
+  UARTprintf( "$G (view parser state)\r\n" );
+  UARTprintf( "$N (view startup blocks)\r\n" );
+  UARTprintf( "$x=value (save Grbl setting)\r\n" );
+  UARTprintf( "$Nx=line (save startup block)\r\n" );
+  UARTprintf( "$C (check gcode mode)\r\n" );
+  UARTprintf( "$X (kill alarm lock)\r\n" );
+  UARTprintf( "$H (run homing cycle)\r\n" );
+  UARTprintf( "~ (cycle start)\r\n" );
+  UARTprintf( "! (feed hold)\r\n" );
+  UARTprintf( "? (current status)\r\n" );
+  UARTprintf( "ctrl-x (reset Grbl)\r\n");
 }
 
 // Grbl global settings print out.
@@ -275,7 +291,7 @@ void report_gcode_modes()
 void report_startup_line(uint8_t n, char *line)
 {
   UARTprintf("$N"); printInteger(n);
-  UARTprintf("="); printString(line);
+  UARTprintf("="); UARTprintf(line);
   UARTprintf("\r\n");
 }
 

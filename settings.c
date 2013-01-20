@@ -1,9 +1,9 @@
 /*
-  settings.c - eeprom configuration handling 
+  settings.c - eeprom configuration handling
   Part of Grbl
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
-  Copyright (c) 2011-2012 Sungeun K. Jeon  
+  Copyright (c) 2011-2012 Sungeun K. Jeon
 
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/eeprom.h"
 
@@ -27,7 +29,6 @@
 #include "stepper.h"
 #include "nuts_bolts.h"
 #include "settings.h"
-#include "eeprom.h"
 #include "limits.h"
 
 settings_t settings;
@@ -37,8 +38,8 @@ void settings_store_startup_line(uint8_t n, char *line)
 {
   ///uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
   ///memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
-  
-  EEPROMProgram( line, EEPROM_ADDR_STARTUP_BLOCK, LINE_BUFFER_SIZE );
+
+//  EEPROMProgram( (unsigned long *) line, EEPROM_ADDR_STARTUP_BLOCK, LINE_BUFFER_SIZE );
 }
 
 // Method to store coord data parameters into EEPROM
@@ -47,21 +48,21 @@ void settings_write_coord_data(uint8_t coord_select, float *coord_data)
   ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
   uint32_t addr = ((uint32_t) coord_select)*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
   ///memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
-  
-  EEPROMProgram( (uint32_t *) coord_data, addr, sizeof(float)*N_AXIS );
+
+//  EEPROMProgram( (unsigned long *) coord_data, addr, sizeof(float)*N_AXIS );
 }
 
 // Method to store Grbl global settings struct and version number into EEPROM
-void write_global_settings() 
+void write_global_settings()
 {
-  ///todo eeprom_put_char(0, SETTINGS_VERSION);
+  ///eeprom_put_char(0, SETTINGS_VERSION);
   ///memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
-  uint32_t v = SETTINGS_VERSION;
-  EEPROMProgram( &v, 0, 4 );
-  EEPROMProgram( (uint32_t *) &settings, EEPROM_ADDR_GLOBAL, sizeof( settings_t )  );
+  unsigned long v = SETTINGS_VERSION;
+//  EEPROMProgram( &v, 0, 4 );
+//  EEPROMProgram( (unsigned long *) &settings, EEPROM_ADDR_GLOBAL, sizeof( settings_t )  );
 }
 
-// Method to reset Grbl global settings back to defaults. 
+// Method to reset Grbl global settings back to defaults.
 void settings_reset(bool reset_all) {
   // Reset all settings or only the migration settings to the new version.
   if (reset_all) {
@@ -97,52 +98,60 @@ void settings_reset(bool reset_all) {
 // Reads startup line from EEPROM. Updated pointed line string data.
 uint8_t settings_read_startup_line(uint8_t n, char *line)
 {
-  uint32_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
+  unsigned long addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
+/*  if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
     // Reset line with default value
     line[0] = 0;
     settings_store_startup_line(n, line);
     return(false);
   } else {
     return(true);
-  }
+  }*/
+//  EEPROMRead( (unsigned long *) line, addr, LINE_BUFFER_SIZE );
+  return true;
 }
 
 // Read selected coordinate data from EEPROM. Updates pointed coord_data value.
 uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 {
-  uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
+  ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  unsigned long addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+/*  if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
     // Reset with default zero vector
-    clear_vector_float(coord_data); 
+    clear_vector_float(coord_data);
     settings_write_coord_data(coord_select,coord_data);
     return(false);
   } else {
     return(true);
-  }
-}  
+  }*/
+//  EEPROMRead( (unsigned long *) coord_data, addr, sizeof(float) * N_AXIS );
+  return true;
+}
 
 // Reads Grbl global settings struct from EEPROM.
 uint8_t read_global_settings() {
   // Check version-byte of eeprom
-  uint8_t version = eeprom_get_char(0);
-  
+  ///uint8_t version = eeprom_get_char(0);
+  unsigned long version = 0;
+//  EEPROMRead( &version, 0, 4 );
+
   if (version == SETTINGS_VERSION) {
     // Read settings-record and check checksum
-    if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) {
-      return(false);
-    }
-  } else {
+    ///if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) return(false);
+//    EEPROMRead( (unsigned long *) &settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t) );
+  } else
+      return false;
+    /*else {
     if (version <= 4) {
       // Migrate from settings version 4 to current version.
       if (!(memcpy_from_eeprom_with_checksum((char*)&settings, 1, sizeof(settings_v4_t)))) {
         return(false);
-      }     
+      }
       settings_reset(false); // Old settings ok. Write new settings only.
-    } else {      
+    } else {
       return(false);
     }
-  }
+  }*/
   return(true);
 }
 
@@ -151,9 +160,9 @@ uint8_t read_global_settings() {
 uint8_t settings_store_global_setting(int parameter, float value) {
   switch(parameter) {
     case 0: case 1: case 2:
-      if (value <= 0.0) { return(STATUS_SETTING_VALUE_NEG); } 
+      if (value <= 0.0) { return(STATUS_SETTING_VALUE_NEG); }
       settings.steps_per_mm[parameter] = value; break;
-    case 3: 
+    case 3:
       if (value < 3) { return(STATUS_SETTING_STEP_PULSE_MIN); }
       settings.pulse_microseconds = round(value); break;
     case 4: settings.default_feed_rate = value; break;
@@ -191,7 +200,7 @@ uint8_t settings_store_global_setting(int parameter, float value) {
     case 20: settings.homing_seek_rate = value; break;
     case 21: settings.homing_debounce_delay = round(value); break;
     case 22: settings.homing_pulloff = value; break;
-    default: 
+    default:
       return(STATUS_INVALID_STATEMENT);
   }
   write_global_settings();
@@ -200,10 +209,10 @@ uint8_t settings_store_global_setting(int parameter, float value) {
 
 // Initialize the config subsystem
 void settings_init() {
-  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
+//  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
   SysCtlDelay( 26 ); ///delay gives the module some time to start
-  EEPROMInit();
-  
+//  EEPROMInit();
+
   if(!read_global_settings()) {
     report_status_message(STATUS_SETTING_READ_FAIL);
     settings_reset(true);

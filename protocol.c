@@ -23,8 +23,9 @@
   #define UART_BUFFERED
 #endif
 
-#include "utils/uartstdio.h"
+#include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
+#include "uartstdio.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
 
