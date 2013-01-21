@@ -32,24 +32,26 @@
 #include "limits.h"
 
 settings_t settings;
+void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size );
+int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size );
 
 // Method to store startup lines into EEPROM
 void settings_store_startup_line(uint8_t n, char *line)
 {
   ///uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  ///memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  unsigned long addr = n * ( LINE_BUFFER_SIZE + 4 ) + EEPROM_ADDR_STARTUP_BLOCK; /// +4 to add CRC uint32
 
-//  EEPROMProgram( (unsigned long *) line, EEPROM_ADDR_STARTUP_BLOCK, LINE_BUFFER_SIZE );
+  ///memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  EEPROMsave( addr, (unsigned long *) line, LINE_BUFFER_SIZE );
 }
 
 // Method to store coord data parameters into EEPROM
 void settings_write_coord_data(uint8_t coord_select, float *coord_data)
 {
   ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  uint32_t addr = ((uint32_t) coord_select)*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
   ///memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
-
-//  EEPROMProgram( (unsigned long *) coord_data, addr, sizeof(float)*N_AXIS );
+  EEPROMsave( addr, (unsigned long *) coord_data, sizeof( float ) * N_AXIS );
 }
 
 // Method to store Grbl global settings struct and version number into EEPROM
@@ -58,8 +60,8 @@ void write_global_settings()
   ///eeprom_put_char(0, SETTINGS_VERSION);
   ///memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
   unsigned long v = SETTINGS_VERSION;
-//  EEPROMProgram( &v, 0, 4 );
-//  EEPROMProgram( (unsigned long *) &settings, EEPROM_ADDR_GLOBAL, sizeof( settings_t )  );
+  EEPROMsave( 0, &v, 4 );
+  EEPROMsave( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) );
 }
 
 // Method to reset Grbl global settings back to defaults.
@@ -98,34 +100,32 @@ void settings_reset(bool reset_all) {
 // Reads startup line from EEPROM. Updated pointed line string data.
 uint8_t settings_read_startup_line(uint8_t n, char *line)
 {
-  unsigned long addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-/*  if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
+  unsigned long addr = n * ( LINE_BUFFER_SIZE + 4 ) + EEPROM_ADDR_STARTUP_BLOCK;
+  ///if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
+  if ( !EEPROMload( addr, (unsigned long *) line, LINE_BUFFER_SIZE) ) {
     // Reset line with default value
     line[0] = 0;
     settings_store_startup_line(n, line);
     return(false);
   } else {
     return(true);
-  }*/
-//  EEPROMRead( (unsigned long *) line, addr, LINE_BUFFER_SIZE );
-  return true;
+  }
 }
 
 // Read selected coordinate data from EEPROM. Updates pointed coord_data value.
 uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 {
   ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  unsigned long addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-/*  if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
+  unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
+  ///if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
+  if ( !EEPROMload( addr, (unsigned long *) coord_data, sizeof( float ) * N_AXIS ) ) {
     // Reset with default zero vector
     clear_vector_float(coord_data);
     settings_write_coord_data(coord_select,coord_data);
     return(false);
   } else {
     return(true);
-  }*/
-//  EEPROMRead( (unsigned long *) coord_data, addr, sizeof(float) * N_AXIS );
-  return true;
+  }
 }
 
 // Reads Grbl global settings struct from EEPROM.
@@ -133,11 +133,12 @@ uint8_t read_global_settings() {
   // Check version-byte of eeprom
   ///uint8_t version = eeprom_get_char(0);
   unsigned long version = 0;
-//  EEPROMRead( &version, 0, 4 );
+  EEPROMload( 0, &version, 4 );
 
   if (version == SETTINGS_VERSION) {
     // Read settings-record and check checksum
     ///if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) return(false);
+    if ( !EEPROMload( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) ) ) return false;
 //    EEPROMRead( (unsigned long *) &settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t) );
   } else
       return false;
@@ -154,7 +155,6 @@ uint8_t read_global_settings() {
   }*/
   return(true);
 }
-
 
 // A helper method to set settings from command line
 uint8_t settings_store_global_setting(int parameter, float value) {
@@ -209,15 +209,16 @@ uint8_t settings_store_global_setting(int parameter, float value) {
 
 // Initialize the config subsystem
 void settings_init() {
-//  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
-  SysCtlDelay( 26 ); ///delay gives the module some time to start
-//  EEPROMInit();
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
+  SysCtlDelay( 26 ); ///delay 1us gives the module some time to start
+  EEPROMInit();
 
   if(!read_global_settings()) {
     report_status_message(STATUS_SETTING_READ_FAIL);
     settings_reset(true);
     report_grbl_settings();
   }
+
   // Read all parameter data into a dummy variable. If error, reset to zero, otherwise do nothing.
   float coord_data[N_AXIS];
   uint8_t i;
@@ -227,4 +228,37 @@ void settings_init() {
     }
   }
   // NOTE: Startup lines are handled and called by main.c at the end of initialization.
+}
+
+/// Save settings to eeprom with crc
+void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size ) {
+  EEPROMProgram( data, addr, size );
+  addr += size;
+
+  unsigned long checksum = 0;
+
+  for( ; size > 0; size -= 4 ) {
+    checksum = ( checksum << 1 ) || ( checksum >> 7 );
+    checksum += *data;
+    data++;
+  }
+
+  EEPROMProgram( &checksum, addr, 4 );
+}
+
+/// Load settings from eeprom with crc
+int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size ) {
+  EEPROMRead( data, addr, size );
+
+  unsigned long checksum2 = 0;
+  EEPROMRead( &checksum2, addr + size, 4 );
+
+  unsigned long checksum = 0;
+  for( ; size > 0; size -= 4 ) {
+    checksum = (checksum << 1) || (checksum >> 7);
+    checksum += *data;
+    data++;
+  }
+
+  return checksum == checksum2;
 }
