@@ -33,7 +33,7 @@
 #include "driverlib/rom_map.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
-#include "uartstdio.h"
+#include "utils/uartstdio.h"
 
 //*****************************************************************************
 //
@@ -1566,7 +1566,7 @@ UARTStdioIntHandler(void)
     unsigned long ulInts;
     char cChar;
     long lChar;
-    static tBoolean bLastWasCR = false;
+    ///static tBoolean bLastWasCR = false;
 
     //
     // Get and clear the current interrupt source(s)
@@ -1614,7 +1614,7 @@ UARTStdioIntHandler(void)
             // operations that would typically be required when supporting a
             // command line.
             //
-            if(!g_bDisableEcho)
+            /*if(!g_bDisableEcho)
             {
                 //
                 // Handle backspace by erasing the last character in the buffer.
@@ -1688,7 +1688,7 @@ UARTStdioIntHandler(void)
                     cChar = '\r';
                     UARTwrite("\n", 1);
                 }
-            }
+            }*/
 
             //
             // If there is space in the receive buffer, put the character
@@ -1699,8 +1699,7 @@ UARTStdioIntHandler(void)
                 //
                 // Store the new character in the receive buffer
                 //
-                g_pcUARTRxBuffer[g_ulUARTRxWriteIndex] =
-                    (unsigned char)(lChar & 0xFF);
+                g_pcUARTRxBuffer[g_ulUARTRxWriteIndex] = (unsigned char)(lChar & 0xFF);
                 ADVANCE_RX_BUFFER_INDEX(g_ulUARTRxWriteIndex);
 
                 //

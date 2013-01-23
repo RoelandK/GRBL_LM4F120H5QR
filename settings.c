@@ -115,6 +115,8 @@ uint8_t settings_read_startup_line(uint8_t n, char *line)
 // Read selected coordinate data from EEPROM. Updates pointed coord_data value.
 uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 {
+  ///return false;
+
   ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
   unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
   ///if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
@@ -238,7 +240,7 @@ void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size ) 
   unsigned long checksum = 0;
 
   for( ; size > 0; size -= 4 ) {
-    checksum = ( checksum << 1 ) || ( checksum >> 7 );
+    ///checksum = ( checksum << 1 ) || ( checksum >> 7 );
     checksum += *data;
     data++;
   }
@@ -255,7 +257,7 @@ int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size ) {
 
   unsigned long checksum = 0;
   for( ; size > 0; size -= 4 ) {
-    checksum = (checksum << 1) || (checksum >> 7);
+    ///checksum = (checksum << 1) || (checksum >> 7);
     checksum += *data;
     data++;
   }

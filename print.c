@@ -65,18 +65,18 @@
 
 void print_uint8_base2(uint8_t n)
 {
-	unsigned char buf[8];
+	char buf[8];
 	uint8_t i = 0;
 
 	for (; i < 8; i++) {
     ///buf[i] = n & 1;
-    buf[i] = '0' + n & 1;
+    buf[i] = n & 1 ? '1' : '0';
 		n >>= 1;
 	}
 
 	///for (; i > 0; i--)
 		///serial_write('0' + buf[i - 1]);
-	UARTwrite( (const char *) buf, 8 );
+	UARTwrite( buf, 8 );
 }
 
 /*
@@ -176,4 +176,9 @@ void printFloat(float n)
 
   a = (int32_t) n;
   UARTprintf( "%d", a ); /// "4560"
+}
+
+/// Print single character
+void printChar( char c ) {
+  UARTwrite( &c, 1 );
 }

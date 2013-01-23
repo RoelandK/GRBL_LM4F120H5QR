@@ -40,8 +40,8 @@
 #include "motion_control.h"
 
 static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
-static uint8_t char_counter; // Last character counter in line variable.
-static uint8_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
+static uint32_t char_counter; // Last character counter in line variable.
+static uint32_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
 
 void pinout_interrupt( void );
 
@@ -339,30 +339,36 @@ void protocol_process()
       }
       char_counter = 0; // Reset line buffer index
       iscomment = false; // Reset comment flag
+      UARTFlushRx();
 
-    } else {
-      if (iscomment) {
-        // Throw away all comment characters
-        if (c == ')') {
-          // End of comment. Resume line.
-          iscomment = false;
-        }
-      } else {
-        if (c <= ' ') {
-          // Throw away whitepace and control characters
-        } else if (c == '/') {
-          // Block delete not supported. Ignore character.
-        } else if (c == '(') {
-          // Enable comments flag and ignore all characters until ')' or EOL.
-          iscomment = true;
-        } else if (char_counter >= LINE_BUFFER_SIZE-1) {
-          // Throw away any characters beyond the end of the line buffer
-        } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
-          line[char_counter++] = c-'a'+'A';
-        } else {
-          line[char_counter++] = c;
-        }
+    } else if ( c == CMD_STATUS_REPORT ) {
+      sys.execute |= EXEC_STATUS_REPORT;
+    } else if ( c == CMD_CYCLE_START ){
+      sys.execute |= EXEC_CYCLE_START;
+    } else if ( c == CMD_FEED_HOLD ) {
+      sys.execute |= EXEC_FEED_HOLD;
+    } else if ( c == CMD_RESET ) {
+      mc_reset();
+    } else if (iscomment) {
+      // Throw away all comment characters
+      if (c == ')') {
+        // End of comment. Resume line.
+        iscomment = false;
       }
+    } else if (c <= ' ') {
+      // Throw away whitepace and control characters todo: implement backspace
+    } else if (c == '/') {
+      // Block delete not supported. Ignore character.
+    } else if (c == '(') {
+      // Enable comments flag and ignore all characters until ')' or EOL.
+      iscomment = true;
+    } else if (char_counter >= LINE_BUFFER_SIZE-1) {
+      // Throw away any characters beyond the end of the line buffer
+    } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
+      line[char_counter++] = c-'a'+'A';
+    } else {
+      line[char_counter++] = c;
     }
   }
 }
+

@@ -115,11 +115,13 @@ void st_wake_up()
 ///      TimerLoadSet( TIMER0_BASE, TIMER_B, (((settings.pulse_microseconds)*TICKS_PER_MICROSECOND) >> 3) );
     #else // Normal operation
       // Set step pulse time. Ad hoc computation from oscilloscope. Uses two's complement.
-      step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
+      ///step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
+      step_pulse_time = ( settings.pulse_microseconds - 2 ) * TICKS_PER_MICROSECOND;
     #endif
     // Enable stepper driver interrupt
     ///TIMSK1 |= (1<<OCIE1A);
-    TimerEnable( TIMER0_BASE, TIMER_A );
+    TimerLoadSet( TIMER2_BASE, TIMER_A, step_pulse_time );
+    TimerEnable( TIMER1_BASE, TIMER_A );
   }
 }
 
@@ -130,9 +132,9 @@ void st_go_idle()
   ///TIMSK1 &= ~(1<<OCIE1A); ///Disable bit 'Timer/Counter1, Output Compare A Match Interrupt Enable' in interrupt mask register
   /// If we disable interrupt, the timer will continue to work. When you will switch on it again, what value will it have?
   ///Maybe it is better to disconnect the clock source?
-  TimerDisable( TIMER0_BASE, TIMER_A );
+  TimerDisable( TIMER1_BASE, TIMER_A );
   /// No function to write value into the timer, though the timer supports this! Texas Instruments, are you crazy?
-  HWREG( TIMER0_BASE + 0x0050 ) = (uint32_t) 0;
+///todo  HWREG( TIMER0_BASE + 0x0050 ) = (uint32_t) 0;
   // Disable steppers only upon system alarm activated or by user setting to not be kept enabled.
   if ((settings.stepper_idle_lock_time != 0xff) || bit_istrue(sys.execute,EXEC_ALARM)) {
     // Force stepper dwell to lock axes for a defined amount of time to ensure the axes come to a complete
@@ -169,7 +171,7 @@ inline static uint8_t iterate_trapezoid_cycle_counter()
 ///ISR(TIMER1_COMPA_vect)
 void timer1_compare_interrupt( void )
 {
-  TimerIntClear( TIMER0_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
+  TimerIntClear( TIMER1_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
 
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
 
@@ -186,10 +188,11 @@ void timer1_compare_interrupt( void )
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly 'settings.pulse_microseconds' microseconds, independent of the main Timer1 prescaler.
   ///TCNT2 = step_pulse_time; // Reload timer counter
-  HWREG( TIMER0_BASE + 0x54 ) = step_pulse_time;
+  ///         HWREG( TIMER0_BASE + 0x54 ) = step_pulse_time;
   ///TCCR2B = (1<<CS21); // Begin timer2. Full speed, 1/8 prescaler
-  TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
-  TimerEnable( TIMER0_BASE, TIMER_B );
+  ///TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
+//  TimerLoadSet( TIMER0_BASE, TIMER_B, step_pulse_time );
+  TimerEnable( TIMER2_BASE, TIMER_A );
 
   busy = true;
   // Re-enable interrupts to allow ISR_TIMER2_OVERFLOW to trigger on-time and allow serial communications
@@ -352,14 +355,14 @@ void timer1_compare_interrupt( void )
 ///ISR(TIMER2_OVF_vect)
 void timer2_overflow_interrupt( void )
 {
-  TimerIntClear( TIMER0_BASE, TIMER_TIMB_TIMEOUT ); /// clear interrupt flag
+  TimerIntClear( TIMER2_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
 
   // Reset stepping pins (leave the direction pins)
   ///STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (settings.invert_mask & STEP_MASK);
   GPIOPinWrite( STEPPING_PORT, STEP_MASK, settings.invert_mask );
   ///TCCR2B = 0; // Disable Timer2 to prevent re-entering this interrupt when it's not needed.
-  TimerDisable( TIMER0_BASE, TIMER_B );
-  HWREG( TIMER0_BASE + 0x054 ) = (uint32_t) 0;
+//  TimerDisable( TIMER0_BASE, TIMER_B );
+  ///HWREG( TIMER0_BASE + 0x054 ) = (uint32_t) 0;
 }
 
 #ifdef STEP_PULSE_DELAY
@@ -428,22 +431,49 @@ void st_init()
     TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
   #endif
 */
-  /// Configure TIMER0 to work as two separate 16-bit timers TIMER_A and TIMER_B
+/*  /// Configure TIMER0 to work as two separate 16-bit timers TIMER_A and TIMER_B
   SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 );
   SysCtlDelay(26); ///give time delay 1 microsecond for timer module to start
-  TimerConfigure( TIMER0_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP | TIMER_CFG_B_PERIODIC_UP );
+  TimerConfigure( TIMER0_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP | TIMER_CFG_B_PERIODIC );
+  TimerIntClear( TIMER0_BASE, 0xffff );
+  TimerControlStall( TIMER0_BASE, TIMER_BOTH, true ); //timers will stall in debug mode
+  IntPrioritySet( INT_TIMER0A, 5 );
+  IntPrioritySet( INT_TIMER0B, 1 );
   /// TIMER_A will act as 16-bit Timer1 in AVR
   /// TIMER_B will act as 8-bit Timer2 in AVR
   /// Timer2 works in GRBL only with 1/8 prescaler
-  TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
+  /// with ARM we don't use prescaler, because 16-bit timer has enough resolution
+  ///TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
   /// Timer2 goes up till 0xFF, we make the same for 16-bit TIMER_B
-  TimerLoadSet( TIMER0_BASE, TIMER_B, 0xFF );
+  ///TimerLoadSet( TIMER0_BASE, TIMER_B, 0xFF );
 
   ///Register iterrupt handlers for timers
   TimerIntRegister( TIMER0_BASE, TIMER_A, timer1_compare_interrupt );
   TimerIntRegister( TIMER0_BASE, TIMER_B, timer2_overflow_interrupt );
   TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-  TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);
+  TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);*/
+
+  // Configure Timer1 to act like Timer1 in AVR
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER1 );
+  SysCtlDelay(26); ///give time delay 1 microsecond for timer1 module to start
+  TimerConfigure( TIMER1_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP );
+  IntPrioritySet( INT_TIMER1A, 2 ); //lower priority than for Timer2 (switch off step-dir signal)
+  TimerControlStall( TIMER1_BASE, TIMER_A, true ); //timer1 will stall in debug mode
+  TimerIntRegister( TIMER1_BASE, TIMER_A, timer1_compare_interrupt );
+///  TimerIntClear( TIMER1_BASE, 0xFFFF ); //disable timer1 immediate interrupt (bug of ARM?)
+  IntPendClear( INT_TIMER1A );
+  TimerIntEnable( TIMER1_BASE, TIMER_TIMA_TIMEOUT );
+
+  // Configure Timer2
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER2 );
+  SysCtlDelay(26); // give time delay 1 microsecond for timer2 module to start
+  TimerConfigure( TIMER2_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_ONE_SHOT_UP );
+  IntPrioritySet( INT_TIMER2A, 1 ); // higher priority than for Timer1 (switch on step-dir output)
+  TimerControlStall( TIMER2_BASE, TIMER_A, true ); //timer2 will stall in debug mode
+  TimerIntRegister( TIMER2_BASE, TIMER_A, timer2_overflow_interrupt );
+///  TimerIntClear( TIMER2_BASE, 0xFFFF ); // disable timer2 immediate interrupt (bug of ARM?)
+  IntPendClear( INT_TIMER1A );
+  TimerIntEnable( TIMER2_BASE, TIMER_TIMA_TIMEOUT );
 
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
   st_wake_up();
@@ -462,43 +492,43 @@ static uint32_t config_step_timer(uint32_t cycles)
     ceiling = cycles;
     ///prescaler = 1; // prescaler: 0
     actual_cycles = ceiling;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1 * 5 ); //prescaler is x5 because ARM is 5x faster (80 MHz)
-    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 1 * 5 ); //prescaler is x5 because ARM is 5x faster (80 MHz)
+    TimerLoadSet( TIMER1_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x7ffffL) { /// <= 524287
     ///timer1 interrupt frequency = 2'000'000/(1+cycles/8) = 244 Hz ... 30,517 Hz
     ceiling = cycles >> 3;
     ///prescaler = 2; // prescaler: 8
     actual_cycles = ceiling * 8L;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 8 * 5 );
-    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 8 * 5 );
+    TimerLoadSet( TIMER1_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x3fffffL) { /// <= 4194303
     ///timer1 interrupt frequency = 250'000/(1+cycles/64) = 3,8146 Hz ... 30,514 Hz
     ceiling =  cycles >> 6;
     ///prescaler = 3; // prescaler: 64
     actual_cycles = ceiling * 64L;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 64 * 5 );
-    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 64 * 5 );
+    TimerLoadSet( TIMER1_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0xffffffL) { /// <= 16777215
     ///timer1 interrupt frequency = 62'500/(1+cycles/256) = 0,95365 Hz ... 3,8145 Hz
     ceiling =  (cycles >> 8);
     ///prescaler = 4; // prescaler: 256
     actual_cycles = ceiling * 256L;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 256 * 5 );
-    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 256 * 5 );
+    TimerLoadSet( TIMER1_BASE, TIMER_A, ceiling );
   } else if (cycles <= 0x3ffffffL) { /// <= 67108863
     ///timer1 interrupt frequency = 15'625/(1+cycles/1024) =  0,238415 Hz ... 0,95362 Hz
     ceiling = (cycles >> 10);
     ///prescaler = 5; // prescaler: 1024
     actual_cycles = ceiling * 1024L;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1024 * 5 );
-    TimerLoadSet( TIMER0_BASE, TIMER_A, ceiling );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 1024 * 5 );
+    TimerLoadSet( TIMER1_BASE, TIMER_A, ceiling );
   } else {
     // Okay, that was slower than we actually go. Just set the slowest speed
     ///timer1 interrupt frequency = 15'625/(1+65535) = 0,238 Hz     (each 4,194304 sec)
     ///ceiling = 0xffff;
     ///prescaler = 5;
-    TimerPrescaleSet( TIMER0_BASE, TIMER_A, 1024 * 5 );
-    TimerLoadSet( TIMER0_BASE, TIMER_A, 0xFFFF );
+    TimerPrescaleSet( TIMER1_BASE, TIMER_A, 1024 * 5 );
+    TimerLoadSet( TIMER1_BASE, TIMER_A, 0xFFFF );
     actual_cycles = 0xffff * 1024;
   }
   // Set prescaler

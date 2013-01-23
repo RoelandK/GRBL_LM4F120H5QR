@@ -175,11 +175,11 @@ void report_grbl_settings() {
   UARTprintf(" (junction deviation, mm)\r\n$10="); printFloat(settings.mm_per_arc_segment);
   UARTprintf(" (arc, mm/segment)\r\n$11="); printInteger(settings.n_arc_correction);
   UARTprintf(" (n-arc correction, int)\r\n$12="); printInteger(settings.decimal_places);
-  UARTprintf(" (n-decimals, int)\r\n$13="); printInteger(bit_istrue(settings.flags,BITFLAG_REPORT_INCHES));
-  UARTprintf(" (report inches, bool)\r\n$14="); printInteger(bit_istrue(settings.flags,BITFLAG_AUTO_START));
-  UARTprintf(" (auto start, bool)\r\n$15="); printInteger(bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE));
-  UARTprintf(" (invert step enable, bool)\r\n$16="); printInteger(bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE));
-  UARTprintf(" (hard limits, bool)\r\n$17="); printInteger(bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE));
+  UARTprintf(" (n-decimals, int)\r\n$13="); printInteger( bit_istrue(settings.flags,BITFLAG_REPORT_INCHES) && 1 );
+  UARTprintf(" (report inches, bool)\r\n$14="); printInteger(bit_istrue(settings.flags,BITFLAG_AUTO_START) && 1);
+  UARTprintf(" (auto start, bool)\r\n$15="); printInteger(bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE) && 1);
+  UARTprintf(" (invert step enable, bool)\r\n$16="); printInteger(bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE) && 1);
+  UARTprintf(" (hard limits, bool)\r\n$17="); printInteger(bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE) && 1);
   UARTprintf(" (homing cycle, bool)\r\n$18="); printInteger(settings.homing_dir_mask);
   UARTprintf(" (homing dir invert mask, int:"); print_uint8_base2(settings.homing_dir_mask);
   UARTprintf(")\r\n$19="); printFloat(settings.homing_feed_rate);

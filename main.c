@@ -39,7 +39,6 @@
 #include "driverlib/gpio.h"
 #include "driverlib/fpu.h"
 #include "driverlib/interrupt.h"
-#include "uartstdio.h"
 
 #include "config.h"
 #include "planner.h"
@@ -53,6 +52,7 @@
 #include "limits.h"
 #include "report.h"
 #include "settings.h"
+#include "uartstdio.h"
 
 // Declare system global variable structure
 system_t sys;
@@ -69,6 +69,7 @@ int main(void)
   GPIOPinConfigure( GPIO_PA1_U0TX );
   GPIOPinTypeUART( GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1 );
   UARTStdioInit( 0 );
+  IntPrioritySet( INT_UART0, 7 ); // lowest priority for UART interrupts
 
   // Initialize system
   settings_init(); // Load grbl settings from EEPROM
