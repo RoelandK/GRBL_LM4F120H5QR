@@ -199,7 +199,7 @@ void timer1_compare_interrupt( void )
   // regardless of time in this handler. The following code prepares the stepper driver for the next
   // step interrupt compare and will always finish before returning to the main program.
   ///sei();
-  IntMasterEnable();
+///  IntMasterEnable();
 
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
@@ -431,36 +431,14 @@ void st_init()
     TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
   #endif
 */
-/*  /// Configure TIMER0 to work as two separate 16-bit timers TIMER_A and TIMER_B
-  SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 );
-  SysCtlDelay(26); ///give time delay 1 microsecond for timer module to start
-  TimerConfigure( TIMER0_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP | TIMER_CFG_B_PERIODIC );
-  TimerIntClear( TIMER0_BASE, 0xffff );
-  TimerControlStall( TIMER0_BASE, TIMER_BOTH, true ); //timers will stall in debug mode
-  IntPrioritySet( INT_TIMER0A, 5 );
-  IntPrioritySet( INT_TIMER0B, 1 );
-  /// TIMER_A will act as 16-bit Timer1 in AVR
-  /// TIMER_B will act as 8-bit Timer2 in AVR
-  /// Timer2 works in GRBL only with 1/8 prescaler
-  /// with ARM we don't use prescaler, because 16-bit timer has enough resolution
-  ///TimerPrescaleSet( TIMER0_BASE, TIMER_B, 8 );
-  /// Timer2 goes up till 0xFF, we make the same for 16-bit TIMER_B
-  ///TimerLoadSet( TIMER0_BASE, TIMER_B, 0xFF );
-
-  ///Register iterrupt handlers for timers
-  TimerIntRegister( TIMER0_BASE, TIMER_A, timer1_compare_interrupt );
-  TimerIntRegister( TIMER0_BASE, TIMER_B, timer2_overflow_interrupt );
-  TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-  TimerIntEnable(TIMER0_BASE, TIMER_TIMB_TIMEOUT);*/
-
-  // Configure Timer1 to act like Timer1 in AVR
+  // Configure Timer1
   SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER1 );
   SysCtlDelay(26); ///give time delay 1 microsecond for timer1 module to start
-  TimerConfigure( TIMER1_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_PERIODIC_UP );
-  IntPrioritySet( INT_TIMER1A, 2 ); //lower priority than for Timer2 (switch off step-dir signal)
+  TimerConfigure( TIMER1_BASE, TIMER_CFG_PERIODIC_UP );
+  IntPrioritySet( INT_TIMER1A, 32 ); //lower priority than for Timer2 (which resets the step-dir signal)
   TimerControlStall( TIMER1_BASE, TIMER_A, true ); //timer1 will stall in debug mode
   TimerIntRegister( TIMER1_BASE, TIMER_A, timer1_compare_interrupt );
-///  TimerIntClear( TIMER1_BASE, 0xFFFF ); //disable timer1 immediate interrupt (bug of ARM?)
+  TimerIntClear( TIMER1_BASE, 0xFFFF ); //disable timer1 immediate interrupt (bug of ARM?)
   IntPendClear( INT_TIMER1A );
   TimerIntEnable( TIMER1_BASE, TIMER_TIMA_TIMEOUT );
 
@@ -468,11 +446,11 @@ void st_init()
   SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER2 );
   SysCtlDelay(26); // give time delay 1 microsecond for timer2 module to start
   TimerConfigure( TIMER2_BASE, TIMER_CFG_SPLIT_PAIR | TIMER_CFG_A_ONE_SHOT_UP );
-  IntPrioritySet( INT_TIMER2A, 1 ); // higher priority than for Timer1 (switch on step-dir output)
+  IntPrioritySet( INT_TIMER2A, 0 ); // highest priority - higher than for Timer1 (which sets the step-dir output)
   TimerControlStall( TIMER2_BASE, TIMER_A, true ); //timer2 will stall in debug mode
   TimerIntRegister( TIMER2_BASE, TIMER_A, timer2_overflow_interrupt );
-///  TimerIntClear( TIMER2_BASE, 0xFFFF ); // disable timer2 immediate interrupt (bug of ARM?)
-  IntPendClear( INT_TIMER1A );
+  TimerIntClear( TIMER2_BASE, 0xFFFF ); // disable timer2 immediate interrupt (bug of ARM?)
+  IntPendClear( INT_TIMER2A );
   TimerIntEnable( TIMER2_BASE, TIMER_TIMA_TIMEOUT );
 
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
@@ -484,7 +462,9 @@ void st_init()
 // Returns the actual number of cycles per interrupt
 static uint32_t config_step_timer(uint32_t cycles)
 {
-  uint16_t ceiling;
+  TimerLoadSet( TIMER1_BASE, TIMER_A, cycles );
+  return cycles;
+/*  uint16_t ceiling;
   ///uint8_t prescaler;
   uint32_t actual_cycles;
   if (cycles <= 0xffffL) {
@@ -536,6 +516,7 @@ static uint32_t config_step_timer(uint32_t cycles)
   // Set ceiling
   ///OCR1A = ceiling;
   return(actual_cycles);
+  */
 }
 
 static void set_step_events_per_minute(uint32_t steps_per_minute)

@@ -67,9 +67,12 @@ static tBoolean g_bDisableEcho;
 // g_ulUARTTxWriteIndex.  Buffer is empty if the two indices are the same.
 //
 //*****************************************************************************
-static unsigned char g_pcUARTTxBuffer[UART_TX_BUFFER_SIZE];
-static volatile unsigned long g_ulUARTTxWriteIndex = 0;
-static volatile unsigned long g_ulUARTTxReadIndex = 0;
+//static
+unsigned char g_pcUARTTxBuffer[UART_TX_BUFFER_SIZE];
+//static volatile
+unsigned long g_ulUARTTxWriteIndex = 0;
+//static volatile
+unsigned long g_ulUARTTxReadIndex = 0;
 
 //*****************************************************************************
 //
@@ -77,9 +80,12 @@ static volatile unsigned long g_ulUARTTxReadIndex = 0;
 // g_ulUARTTxWriteIndex.  Buffer is empty if the two indices are the same.
 //
 //*****************************************************************************
-static unsigned char g_pcUARTRxBuffer[UART_RX_BUFFER_SIZE];
-static volatile unsigned long g_ulUARTRxWriteIndex = 0;
-static volatile unsigned long g_ulUARTRxReadIndex = 0;
+//static
+unsigned char g_pcUARTRxBuffer[UART_RX_BUFFER_SIZE];
+//static volatile
+unsigned long g_ulUARTRxWriteIndex = 0;
+//static volatile
+unsigned long g_ulUARTRxReadIndex = 0;
 
 //*****************************************************************************
 //
