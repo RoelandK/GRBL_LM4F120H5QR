@@ -23,14 +23,6 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#ifndef UART_BUFFERED
-  #define UART_BUFFERED
-#endif
-
-#ifndef PART_LM4F120H5QR
-  #define PART_LM4F120H5QR
-#endif
-
 #include "inc/hw_types.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_ints.h"
@@ -52,7 +44,7 @@
 #include "limits.h"
 #include "report.h"
 #include "settings.h"
-#include "uartstdio.h"
+#include "serial.h"
 
 // Declare system global variable structure
 system_t sys;
@@ -63,19 +55,18 @@ int main(void)
 	FPUEnable(); //enable the Floating Point Unit
 	FPUStackingEnable(); // Enable stacking for interrupt handlers
 
-  // Enable and Initialize the UART.
-  SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA );
-  GPIOPinConfigure( GPIO_PA0_U0RX );
-  GPIOPinConfigure( GPIO_PA1_U0TX );
-  GPIOPinTypeUART( GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1 );
-  UARTStdioInit( 0 );
-  IntPrioritySet( INT_UART0, 7 ); // lowest priority for UART interrupts
-
   // Initialize system
+  serial_init(); // Enable and Initialize the UART.
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
-  ///sei(); // Enable interrupts
+
+#ifdef PART_LM4F120H5QR
+  // ARM code
   IntMasterEnable();
+#else
+  // AVR code
+  sei(); // Enable interrupts
+#endif
 
   memset(&sys, 0, sizeof(sys));  // Clear all system variables
   sys.abort = true;   // Set abort to complete initialization
@@ -88,10 +79,7 @@ int main(void)
     // reset to finish the initialization process.
     if (sys.abort) {
       // Reset system.
-      ///serial_reset_read_buffer(); // Clear serial read buffer
-      ///UARTFlushRx();
-      ///UARTFlushTx( true );
-
+      serial_reset_read_buffer(); // Clear serial read buffer
       plan_init(); // Clear block buffer and planner variables
       gc_init(); // Set g-code parser to default state
       protocol_init(); // Clear incoming line data and execute startup lines

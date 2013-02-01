@@ -26,9 +26,12 @@
   methods to accomodate their needs.
 */
 
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "uartstdio.h"
+#ifdef PART_LM4F120H5QR
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+#else
+  #include <avr/pgmspace.h>
+#endif
 
 #include "report.h"
 #include "print.h"
@@ -49,50 +52,50 @@
 void report_status_message(uint8_t status_code)
 {
   if (status_code == 0) { // STATUS_OK
-    UARTprintf("ok\r\n");
+    printPgmString("ok\r\n");
   } else {
-    UARTprintf("error: ");
+    printPgmString("error: ");
     switch(status_code) {
       case STATUS_BAD_NUMBER_FORMAT:
-      UARTprintf("Bad number format"); break;
+      printPgmString("Bad number format"); break;
       case STATUS_EXPECTED_COMMAND_LETTER:
-      UARTprintf("Expected command letter"); break;
+      printPgmString("Expected command letter"); break;
       case STATUS_UNSUPPORTED_STATEMENT:
-      UARTprintf("Unsupported statement"); break;
+      printPgmString("Unsupported statement"); break;
       case STATUS_ARC_RADIUS_ERROR:
-      UARTprintf("Invalid radius"); break;
+      printPgmString("Invalid radius"); break;
       case STATUS_MODAL_GROUP_VIOLATION:
-      UARTprintf("Modal group violation"); break;
+      printPgmString("Modal group violation"); break;
       case STATUS_INVALID_STATEMENT:
-      UARTprintf("Invalid statement"); break;
+      printPgmString("Invalid statement"); break;
       case STATUS_SETTING_DISABLED:
-      UARTprintf("Setting disabled"); break;
+      printPgmString("Setting disabled"); break;
       case STATUS_SETTING_VALUE_NEG:
-      UARTprintf("Value < 0.0"); break;
+      printPgmString("Value < 0.0"); break;
       case STATUS_SETTING_STEP_PULSE_MIN:
-      UARTprintf("Value < 3 usec"); break;
+      printPgmString("Value < 3 usec"); break;
       case STATUS_SETTING_READ_FAIL:
-      UARTprintf("EEPROM read fail. Using defaults"); break;
+      printPgmString("EEPROM read fail. Using defaults"); break;
       case STATUS_IDLE_ERROR:
-      UARTprintf("Busy or queued"); break;
+      printPgmString("Busy or queued"); break;
       case STATUS_ALARM_LOCK:
-      UARTprintf("Alarm lock"); break;
+      printPgmString("Alarm lock"); break;
     }
-    UARTprintf("\r\n");
+    printPgmString("\r\n");
   }
 }
 
 // Prints alarm messages.
 void report_alarm_message(int8_t alarm_code)
 {
-  UARTprintf("ALARM: ");
+  printPgmString("ALARM: ");
   switch (alarm_code) {
     case ALARM_HARD_LIMIT:
-    UARTprintf("Hard limit"); break;
+    printPgmString("Hard limit"); break;
     case ALARM_ABORT_CYCLE:
-    UARTprintf("Abort during cycle"); break;
+    printPgmString("Abort during cycle"); break;
   }
-  UARTprintf(". MPos?\r\n");
+  printPgmString(". MPos?\r\n");
   delay_ms(500); // Force delay to ensure message clears serial write buffer.
 }
 
@@ -104,32 +107,32 @@ void report_alarm_message(int8_t alarm_code)
 // TODO: Install silence feedback messages option in settings
 void report_feedback_message(uint8_t message_code)
 {
-  UARTprintf("[");
+  printPgmString("[");
   switch(message_code) {
     case MESSAGE_CRITICAL_EVENT:
-    UARTprintf("Reset to continue"); break;
+    printPgmString("Reset to continue"); break;
     case MESSAGE_ALARM_LOCK:
-    UARTprintf("'$H'|'$X' to unlock"); break;
+    printPgmString("'$H'|'$X' to unlock"); break;
     case MESSAGE_ALARM_UNLOCK:
-    UARTprintf("Caution: Unlocked"); break;
+    printPgmString("Caution: Unlocked"); break;
     case MESSAGE_ENABLED:
-    UARTprintf("Enabled"); break;
+    printPgmString("Enabled"); break;
     case MESSAGE_DISABLED:
-    UARTprintf("Disabled"); break;
+    printPgmString("Disabled"); break;
   }
-  UARTprintf("]\r\n");
+  printPgmString("]\r\n");
 }
 
 
 // Welcome message
 void report_init_message()
 {
-  UARTprintf("\r\nGrbl " GRBL_VERSION " ['$' for help]\r\n");
+  printPgmString("\r\nGrbl " GRBL_VERSION " ['$' for help]\r\n");
 }
 
 // Grbl help message
 void report_grbl_help() {
-/*  UARTprintf("$$ (view Grbl settings)\r\n"
+  printPgmString("$$ (view Grbl settings)\r\n"
                       "$# (view # parameters)\r\n"
                       "$G (view parser state)\r\n"
                       "$N (view startup blocks)\r\n"
@@ -141,52 +144,38 @@ void report_grbl_help() {
                       "~ (cycle start)\r\n"
                       "! (feed hold)\r\n"
                       "? (current status)\r\n"
-                      "ctrl-x (reset Grbl)\r\n");*/
-
-  UARTprintf( "$$ (view Grbl settings)\r\n" );
-  UARTprintf( "$# (view # parameters)\r\n" );
-  UARTprintf( "$G (view parser state)\r\n" );
-  UARTprintf( "$N (view startup blocks)\r\n" );
-  UARTprintf( "$x=value (save Grbl setting)\r\n" );
-  UARTprintf( "$Nx=line (save startup block)\r\n" );
-  UARTprintf( "$C (check gcode mode)\r\n" );
-  UARTprintf( "$X (kill alarm lock)\r\n" );
-  UARTprintf( "$H (run homing cycle)\r\n" );
-  UARTprintf( "~ (cycle start)\r\n" );
-  UARTprintf( "! (feed hold)\r\n" );
-  UARTprintf( "? (current status)\r\n" );
-  UARTprintf( "ctrl-x (reset Grbl)\r\n");
+                      "ctrl-x (reset Grbl)\r\n");
 }
 
 // Grbl global settings print out.
 // NOTE: The numbering scheme here must correlate to storing in settings.c
 void report_grbl_settings() {
-  UARTprintf("$0="); printFloat(settings.steps_per_mm[X_AXIS]);
-  UARTprintf(" (x, step/mm)\r\n$1="); printFloat(settings.steps_per_mm[Y_AXIS]);
-  UARTprintf(" (y, step/mm)\r\n$2="); printFloat(settings.steps_per_mm[Z_AXIS]);
-  UARTprintf(" (z, step/mm)\r\n$3="); printInteger(settings.pulse_microseconds);
-  UARTprintf(" (step pulse, usec)\r\n$4="); printFloat(settings.default_feed_rate);
-  UARTprintf(" (default feed, mm/min)\r\n$5="); printFloat(settings.default_seek_rate);
-  UARTprintf(" (default seek, mm/min)\r\n$6="); printInteger(settings.invert_mask);
-  UARTprintf(" (step port invert mask, int:"); print_uint8_base2(settings.invert_mask);
-  UARTprintf(")\r\n$7="); printInteger(settings.stepper_idle_lock_time);
-  UARTprintf(" (step idle delay, msec)\r\n$8="); printFloat(settings.acceleration/(60*60)); // Convert from mm/min^2 for human readability
-  UARTprintf(" (acceleration, mm/sec^2)\r\n$9="); printFloat(settings.junction_deviation);
-  UARTprintf(" (junction deviation, mm)\r\n$10="); printFloat(settings.mm_per_arc_segment);
-  UARTprintf(" (arc, mm/segment)\r\n$11="); printInteger(settings.n_arc_correction);
-  UARTprintf(" (n-arc correction, int)\r\n$12="); printInteger(settings.decimal_places);
-  UARTprintf(" (n-decimals, int)\r\n$13="); printInteger( bit_istrue(settings.flags,BITFLAG_REPORT_INCHES) && 1 );
-  UARTprintf(" (report inches, bool)\r\n$14="); printInteger(bit_istrue(settings.flags,BITFLAG_AUTO_START) && 1);
-  UARTprintf(" (auto start, bool)\r\n$15="); printInteger(bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE) && 1);
-  UARTprintf(" (invert step enable, bool)\r\n$16="); printInteger(bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE) && 1);
-  UARTprintf(" (hard limits, bool)\r\n$17="); printInteger(bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE) && 1);
-  UARTprintf(" (homing cycle, bool)\r\n$18="); printInteger(settings.homing_dir_mask);
-  UARTprintf(" (homing dir invert mask, int:"); print_uint8_base2(settings.homing_dir_mask);
-  UARTprintf(")\r\n$19="); printFloat(settings.homing_feed_rate);
-  UARTprintf(" (homing feed, mm/min)\r\n$20="); printFloat(settings.homing_seek_rate);
-  UARTprintf(" (homing seek, mm/min)\r\n$21="); printInteger(settings.homing_debounce_delay);
-  UARTprintf(" (homing debounce, msec)\r\n$22="); printFloat(settings.homing_pulloff);
-  UARTprintf(" (homing pull-off, mm)\r\n");
+  printPgmString("$0="); printFloat(settings.steps_per_mm[X_AXIS]);
+  printPgmString(" (x, step/mm)\r\n$1="); printFloat(settings.steps_per_mm[Y_AXIS]);
+  printPgmString(" (y, step/mm)\r\n$2="); printFloat(settings.steps_per_mm[Z_AXIS]);
+  printPgmString(" (z, step/mm)\r\n$3="); printInteger(settings.pulse_microseconds);
+  printPgmString(" (step pulse, usec)\r\n$4="); printFloat(settings.default_feed_rate);
+  printPgmString(" (default feed, mm/min)\r\n$5="); printFloat(settings.default_seek_rate);
+  printPgmString(" (default seek, mm/min)\r\n$6="); printInteger(settings.invert_mask);
+  printPgmString(" (step port invert mask, int:"); print_uint8_base2(settings.invert_mask);
+  printPgmString(")\r\n$7="); printInteger(settings.stepper_idle_lock_time);
+  printPgmString(" (step idle delay, msec)\r\n$8="); printFloat(settings.acceleration/(60*60)); // Convert from mm/min^2 for human readability
+  printPgmString(" (acceleration, mm/sec^2)\r\n$9="); printFloat(settings.junction_deviation);
+  printPgmString(" (junction deviation, mm)\r\n$10="); printFloat(settings.mm_per_arc_segment);
+  printPgmString(" (arc, mm/segment)\r\n$11="); printInteger(settings.n_arc_correction);
+  printPgmString(" (n-arc correction, int)\r\n$12="); printInteger(settings.decimal_places);
+  printPgmString(" (n-decimals, int)\r\n$13="); printInteger( bit_istrue(settings.flags,BITFLAG_REPORT_INCHES) && 1 );
+  printPgmString(" (report inches, bool)\r\n$14="); printInteger(bit_istrue(settings.flags,BITFLAG_AUTO_START) && 1);
+  printPgmString(" (auto start, bool)\r\n$15="); printInteger(bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE) && 1);
+  printPgmString(" (invert step enable, bool)\r\n$16="); printInteger(bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE) && 1);
+  printPgmString(" (hard limits, bool)\r\n$17="); printInteger(bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE) && 1);
+  printPgmString(" (homing cycle, bool)\r\n$18="); printInteger(settings.homing_dir_mask);
+  printPgmString(" (homing dir invert mask, int:"); print_uint8_base2(settings.homing_dir_mask);
+  printPgmString(")\r\n$19="); printFloat(settings.homing_feed_rate);
+  printPgmString(" (homing feed, mm/min)\r\n$20="); printFloat(settings.homing_seek_rate);
+  printPgmString(" (homing seek, mm/min)\r\n$21="); printInteger(settings.homing_debounce_delay);
+  printPgmString(" (homing debounce, msec)\r\n$22="); printFloat(settings.homing_pulloff);
+  printPgmString(" (homing pull-off, mm)\r\n");
 }
 
 
@@ -200,31 +189,31 @@ void report_gcode_parameters()
       report_status_message(STATUS_SETTING_READ_FAIL);
       return;
     }
-    UARTprintf("[G");
+    printPgmString("[G");
     switch (coord_select) {
-      case 0: UARTprintf("54:"); break;
-      case 1: UARTprintf("55:"); break;
-      case 2: UARTprintf("56:"); break;
-      case 3: UARTprintf("57:"); break;
-      case 4: UARTprintf("58:"); break;
-      case 5: UARTprintf("59:"); break;
-      case 6: UARTprintf("28:"); break;
-      case 7: UARTprintf("30:"); break;
-      // case 8: UARTprintf("92:")); break; // G92.2, G92.3 not supported. Hence not stored.
+      case 0: printPgmString("54:"); break;
+      case 1: printPgmString("55:"); break;
+      case 2: printPgmString("56:"); break;
+      case 3: printPgmString("57:"); break;
+      case 4: printPgmString("58:"); break;
+      case 5: printPgmString("59:"); break;
+      case 6: printPgmString("28:"); break;
+      case 7: printPgmString("30:"); break;
+      // case 8: printPgmString("92:")); break; // G92.2, G92.3 not supported. Hence not stored.
     }
     for (i=0; i<N_AXIS; i++) {
       if (bit_istrue(settings.flags,BITFLAG_REPORT_INCHES)) { printFloat(coord_data[i]*INCH_PER_MM); }
       else { printFloat(coord_data[i]); }
-      if (i < (N_AXIS-1)) { UARTprintf(","); }
-      else { UARTprintf("]\r\n"); }
+      if (i < (N_AXIS-1)) { printPgmString(","); }
+      else { printPgmString("]\r\n"); }
     }
   }
-  UARTprintf("[G92:"); // Print G92,G92.1 which are not persistent in memory
+  printPgmString("[G92:"); // Print G92,G92.1 which are not persistent in memory
   for (i=0; i<N_AXIS; i++) {
     if (bit_istrue(settings.flags,BITFLAG_REPORT_INCHES)) { printFloat(gc.coord_offset[i]*INCH_PER_MM); }
     else { printFloat(gc.coord_offset[i]); }
-    if (i < (N_AXIS-1)) { UARTprintf(","); }
-    else { UARTprintf("]\r\n"); }
+    if (i < (N_AXIS-1)) { printPgmString(","); }
+    else { printPgmString("]\r\n"); }
   }
 }
 
@@ -233,66 +222,66 @@ void report_gcode_parameters()
 void report_gcode_modes()
 {
   switch (gc.motion_mode) {
-    case MOTION_MODE_SEEK : UARTprintf("[G0"); break;
-    case MOTION_MODE_LINEAR : UARTprintf("[G1"); break;
-    case MOTION_MODE_CW_ARC : UARTprintf("[G2"); break;
-    case MOTION_MODE_CCW_ARC : UARTprintf("[G3"); break;
-    case MOTION_MODE_CANCEL : UARTprintf("[G80"); break;
+    case MOTION_MODE_SEEK : printPgmString("[G0"); break;
+    case MOTION_MODE_LINEAR : printPgmString("[G1"); break;
+    case MOTION_MODE_CW_ARC : printPgmString("[G2"); break;
+    case MOTION_MODE_CCW_ARC : printPgmString("[G3"); break;
+    case MOTION_MODE_CANCEL : printPgmString("[G80"); break;
   }
 
-  UARTprintf(" G");
+  printPgmString(" G");
   printInteger(gc.coord_select+54);
 
   if (gc.plane_axis_0 == X_AXIS) {
-    if (gc.plane_axis_1 == Y_AXIS) { UARTprintf(" G17"); }
-    else { UARTprintf(" G18"); }
-  } else { UARTprintf(" G19"); }
+    if (gc.plane_axis_1 == Y_AXIS) { printPgmString(" G17"); }
+    else { printPgmString(" G18"); }
+  } else { printPgmString(" G19"); }
 
-  if (gc.inches_mode) { UARTprintf(" G20"); }
-  else { UARTprintf(" G21"); }
+  if (gc.inches_mode) { printPgmString(" G20"); }
+  else { printPgmString(" G21"); }
 
-  if (gc.absolute_mode) { UARTprintf(" G90"); }
-  else { UARTprintf(" G91"); }
+  if (gc.absolute_mode) { printPgmString(" G90"); }
+  else { printPgmString(" G91"); }
 
-  if (gc.inverse_feed_rate_mode) { UARTprintf(" G93"); }
-  else { UARTprintf(" G94"); }
+  if (gc.inverse_feed_rate_mode) { printPgmString(" G93"); }
+  else { printPgmString(" G94"); }
 
   switch (gc.program_flow) {
-    case PROGRAM_FLOW_RUNNING : UARTprintf(" M0"); break;
-    case PROGRAM_FLOW_PAUSED : UARTprintf(" M1"); break;
-    case PROGRAM_FLOW_COMPLETED : UARTprintf(" M2"); break;
+    case PROGRAM_FLOW_RUNNING : printPgmString(" M0"); break;
+    case PROGRAM_FLOW_PAUSED : printPgmString(" M1"); break;
+    case PROGRAM_FLOW_COMPLETED : printPgmString(" M2"); break;
   }
 
   switch (gc.spindle_direction) {
-    case 1 : UARTprintf(" M3"); break;
-    case -1 : UARTprintf(" M4"); break;
-    case 0 : UARTprintf(" M5"); break;
+    case 1 : printPgmString(" M3"); break;
+    case -1 : printPgmString(" M4"); break;
+    case 0 : printPgmString(" M5"); break;
   }
 
   switch (gc.coolant_mode) {
-    case COOLANT_DISABLE : UARTprintf(" M9"); break;
-    case COOLANT_FLOOD_ENABLE : UARTprintf(" M8"); break;
+    case COOLANT_DISABLE : printPgmString(" M9"); break;
+    case COOLANT_FLOOD_ENABLE : printPgmString(" M8"); break;
     #ifdef ENABLE_M7
-      case COOLANT_MIST_ENABLE : UARTprintf(" M7"); break;
+      case COOLANT_MIST_ENABLE : printPgmString(" M7"); break;
     #endif
   }
 
-  UARTprintf(" T");
+  printPgmString(" T");
   printInteger(gc.tool);
 
-  UARTprintf(" F");
+  printPgmString(" F");
   if (gc.inches_mode) { printFloat(gc.feed_rate*INCH_PER_MM); }
   else { printFloat(gc.feed_rate); }
 
-  UARTprintf("]\r\n");
+  printPgmString("]\r\n");
 }
 
 // Prints specified startup line
 void report_startup_line(uint8_t n, char *line)
 {
-  UARTprintf("$N"); printInteger(n);
-  UARTprintf("="); UARTprintf(line);
-  UARTprintf("\r\n");
+  printPgmString("$N"); printInteger(n);
+  printPgmString("="); printPgmString(line);
+  printPgmString("\r\n");
 }
 
  // Prints real-time data. This function grabs a real-time snapshot of the stepper subprogram
@@ -313,27 +302,27 @@ void report_realtime_status()
 
   // Report current machine state
   switch (sys.state) {
-    case STATE_IDLE: UARTprintf("<Idle"); break;
-//    case STATE_INIT: UARTprintf("[Init")); break; // Never observed
-    case STATE_QUEUED: UARTprintf("<Queue"); break;
-    case STATE_CYCLE: UARTprintf("<Run"); break;
-    case STATE_HOLD: UARTprintf("<Hold"); break;
-    case STATE_HOMING: UARTprintf("<Home"); break;
-    case STATE_ALARM: UARTprintf("<Alarm"); break;
-    case STATE_CHECK_MODE: UARTprintf("<Check"); break;
+    case STATE_IDLE: printPgmString("<Idle"); break;
+//    case STATE_INIT: printPgmString("[Init")); break; // Never observed
+    case STATE_QUEUED: printPgmString("<Queue"); break;
+    case STATE_CYCLE: printPgmString("<Run"); break;
+    case STATE_HOLD: printPgmString("<Hold"); break;
+    case STATE_HOMING: printPgmString("<Home"); break;
+    case STATE_ALARM: printPgmString("<Alarm"); break;
+    case STATE_CHECK_MODE: printPgmString("<Check"); break;
   }
 
   // Report machine position
-  UARTprintf(",MPos:");
+  printPgmString(",MPos:");
   for (i=0; i<= 2; i++) {
     print_position[i] = current_position[i]/settings.steps_per_mm[i];
     if (bit_istrue(settings.flags,BITFLAG_REPORT_INCHES)) { print_position[i] *= INCH_PER_MM; }
     printFloat(print_position[i]);
-    UARTprintf(",");
+    printPgmString(",");
   }
 
   // Report work position
-  UARTprintf("WPos:");
+  printPgmString("WPos:");
   for (i=0; i<= 2; i++) {
     if (bit_istrue(settings.flags,BITFLAG_REPORT_INCHES)) {
       print_position[i] -= (gc.coord_system[i]+gc.coord_offset[i])*INCH_PER_MM;
@@ -341,8 +330,8 @@ void report_realtime_status()
       print_position[i] -= gc.coord_system[i]+gc.coord_offset[i];
     }
     printFloat(print_position[i]);
-    if (i < 2) { UARTprintf(","); }
+    if (i < 2) { printPgmString(","); }
   }
 
-  UARTprintf(">\r\n");
+  printPgmString(">\r\n");
 }

@@ -1,5 +1,5 @@
 /*
-  print.h - Functions for formatting output strings
+  serial.c - Low level functions for sending and recieving bytes via the serial port
   Part of Grbl
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
@@ -22,26 +22,38 @@
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
    used to be a part of the Arduino project. */
 
-#ifndef print_h
-#define print_h
+#ifndef serial_h
+#define serial_h
 
-void printString(const char *s);
+#include "nuts_bolts.h"
 
-#ifdef PART_LM4F120H5QR
-  // ARM code
-  #define printPgmString(a) printString(a)
-#else
-  // AVR code
-  #define printPgmString(a) _printPgmString(PSTR(a))
-  void _printPgmString(const char *s);
+#ifndef RX_BUFFER_SIZE
+  #define RX_BUFFER_SIZE 128
+#endif
+#ifndef TX_BUFFER_SIZE
+  #define TX_BUFFER_SIZE 128
 #endif
 
-void printInteger(long n);
+#define SERIAL_NO_DATA 0xff
 
-void print_uint8_base2(uint8_t n);
+#ifdef ENABLE_XONXOFF
+  #define RX_BUFFER_FULL 96 // XOFF high watermark
+  #define RX_BUFFER_LOW 64 // XON low watermark
+  #define SEND_XOFF 1
+  #define SEND_XON 2
+  #define XOFF_SENT 3
+  #define XON_SENT 4
+  #define XOFF_CHAR 0x13
+  #define XON_CHAR 0x11
+#endif
 
-void printFloat(float n);
+void serial_init();
 
-void printChar( char c );
+void serial_write(uint8_t data);
+
+uint8_t serial_read();
+
+// Reset and empty data in read buffer. Used by e-stop and reset.
+void serial_reset_read_buffer();
 
 #endif

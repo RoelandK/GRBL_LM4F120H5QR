@@ -21,26 +21,32 @@
 
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
    used to be a part of the Arduino project. */
+#ifdef PART_LM4F120H5QR
+  #include "inc/hw_types.h"
+#else
+  #include <avr/pgmspace.h>
+#endif
 
-#include "inc/hw_types.h"
-#include "uartstdio.h"
-
+#include "serial.h"
 #include "config.h"
 #include "settings.h"
 
-/*void printString(const char *s)
+void printString(const char *s)
 {
   while (*s)
     serial_write(*s++);
-}*/
+}
 
+#ifndef PART_LM4F120H5QR
+// AVR code
 // Print a string stored in PGM-memory
-/*void printPgmString(const char *s)
+void _printPgmString(const char *s)
 {
   char c;
   while ((c = pgm_read_byte_near(s++)))
     serial_write(c);
-}*/
+}
+#endif
 
 // void printIntegerInBase(unsigned long n, unsigned long base)
 // {
@@ -69,17 +75,14 @@ void print_uint8_base2(uint8_t n)
 	uint8_t i = 0;
 
 	for (; i < 8; i++) {
-    ///buf[i] = n & 1;
-    buf[i] = n & 1 ? '1' : '0';
+    buf[i] = n & 1;
 		n >>= 1;
 	}
 
-	///for (; i > 0; i--)
-		///serial_write('0' + buf[i - 1]);
-	UARTwrite( buf, 8 );
+	for (; i > 0; i--)
+		serial_write('0' + buf[i - 1]);
 }
 
-/*
 static void print_uint32_base10(unsigned long n)
 {
   unsigned char buf[10];
@@ -98,18 +101,14 @@ static void print_uint32_base10(unsigned long n)
   for (; i > 0; i--)
     serial_write(buf[i-1]);
 }
-*/
 
 void printInteger(long n)
 {
-/*
   if (n < 0) {
     serial_write('-');
     n = -n;
   }
   print_uint32_base10(n);
-*/
-  UARTprintf( "%i", n );
 }
 
 // Convert float to string by immediately converting to a long integer, which contains
@@ -119,10 +118,8 @@ void printInteger(long n)
 // techniques are actually just slightly slower. Found this out the hard way.
 void printFloat(float n)
 {
-/*
   if (n < 0) {
-    ///serial_write('-');
-    UARTprintf( "-" );
+    serial_write('-');
     n = -n;
   }
 
@@ -158,27 +155,4 @@ void printFloat(float n)
   // Print the generated string.
   for (; i > 0; i--)
     serial_write(buf[i]);
-*/
-
-                           /// n=-123.456
-  int32_t a = (int32_t) n; /// a=-123
-  UARTprintf( "%d", a );   /// "-123"
-  UARTprintf( "." );       /// "-123."
-  n -= (float) a;          /// n=-.456
-
-  uint8_t decimals = settings.decimal_places; /// e.x. decimals=4
-  while ( decimals ) {
-    n *= 10;
-    decimals--;
-  }
-                         /// n=-4560
-  if ( n < 0.0 ) n = -n; /// n=4560
-
-  a = (int32_t) n;
-  UARTprintf( "%d", a ); /// "4560"
-}
-
-/// Print single character
-void printChar( char c ) {
-  UARTwrite( &c, 1 );
 }

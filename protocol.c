@@ -19,18 +19,23 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef UART_BUFFERED
-  #define UART_BUFFERED
-#endif
+#ifdef PART_LM4F120H5QR
+  // ARM includes
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
 
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "uartstdio.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
+  void pinout_interrupt( void ); //declaration
+#else
+  // AVR includes
+  #include <avr/io.h>
+  #include <avr/interrupt.h>
+#endif
 
 #include "protocol.h"
 #include "gcode.h"
+#include "serial.h"
 #include "print.h"
 #include "settings.h"
 #include "config.h"
@@ -43,19 +48,14 @@ static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
 static uint32_t char_counter; // Last character counter in line variable.
 static uint32_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
 
-void pinout_interrupt( void );
-
 void protocol_init()
 {
   char_counter = 0; // Reset line input
   iscomment = false;
   report_init_message(); // Welcome message
 
-  ///PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
-  ///PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
-  ///PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
-  ///PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
-
+#ifdef PART_LM4F120H5QR
+  // ARM code
   SysCtlPeripheralEnable( PINOUT_SYSCTL_PERIPH ); ///Enable the GPIO module for PINOUT port
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
 
@@ -64,6 +64,13 @@ void protocol_init()
   GPIOPortIntRegister( PINOUT_PORT, pinout_interrupt ); //register a call-back funcion for interrupt
   GPIOIntTypeSet( PINOUT_PORT, PINOUT_MASK, GPIO_BOTH_EDGES ); // Enable specific pins of the Pin Change Interrupt
   GPIOPinIntEnable( PINOUT_PORT, PINOUT_MASK ); // Enable Pin Change Interrupt
+#else
+  // AVR code
+  PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
+  PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
+  PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
+  PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
+#endif
 }
 
 // Executes user startup script, if stored.
@@ -75,8 +82,7 @@ void protocol_execute_startup()
       report_status_message(STATUS_SETTING_READ_FAIL);
     } else {
       if (line[0] != 0) {
-        ///printString(line); // Echo startup line to indicate execution.
-        UARTprintf( line );
+        printString(line); // Echo startup line to indicate execution.
         report_status_message(gc_execute_line(line));
       }
     }
@@ -87,21 +93,10 @@ void protocol_execute_startup()
 // only the runtime command execute variable to have the main program execute these when
 // its ready. This works exactly like the character-based runtime commands when picked off
 // directly from the incoming serial data stream.
-///ISR(PINOUT_INT_vect)
-void pinout_interrupt( void )
-{
+#ifdef PART_LM4F120H5QR
+// ARM code
+void pinout_interrupt( void ) {
   GPIOPinIntClear( PINOUT_PORT, PINOUT_MASK ); ///clear interrupt flag
-
-  // Enter only if any pinout pin is actively low.
-/*  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) {
-    if (bit_isfalse(PINOUT_PIN,bit(PIN_RESET))) {
-      mc_reset();
-    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_FEED_HOLD))) {
-      sys.execute |= EXEC_FEED_HOLD;
-    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_CYCLE_START))) {
-      sys.execute |= EXEC_CYCLE_START;
-    }
-  }*/
 
   if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_RESET ) ) {
     mc_reset();
@@ -113,6 +108,24 @@ void pinout_interrupt( void )
     sys.execute |= EXEC_CYCLE_START;
   }
 }
+#endif
+
+#ifndef PART_LM4F120H5QR
+// AVR code
+ISR(PINOUT_INT_vect)
+{
+  // Enter only if any pinout pin is actively low.
+  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) {
+    if (bit_isfalse(PINOUT_PIN,bit(PIN_RESET))) {
+      mc_reset();
+    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_FEED_HOLD))) {
+      sys.execute |= EXEC_FEED_HOLD;
+    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_CYCLE_START))) {
+      sys.execute |= EXEC_CYCLE_START;
+    }
+  }
+}
+#endif
 
 // Executes run-time commands, when required. This is called from various check points in the main
 // program, primarily where there may be a while loop waiting for a buffer to clear space or any
@@ -318,10 +331,7 @@ uint8_t protocol_execute_line(char *line)
 void protocol_process()
 {
   uint8_t c;
-  //while((c = serial_read()) != SERIAL_NO_DATA) {
-  while( UARTRxBytesAvail() ) {
-    c = UARTgetc();
-
+  while((c = serial_read()) != SERIAL_NO_DATA) {
     if ((c == '\n') || (c == '\r')) { // End of line reached
 
       // Runtime command check point before executing line. Prevent any furthur line executions.
@@ -339,36 +349,30 @@ void protocol_process()
       }
       char_counter = 0; // Reset line buffer index
       iscomment = false; // Reset comment flag
-      UARTFlushRx();
 
-    } else if ( c == CMD_STATUS_REPORT ) {
-      sys.execute |= EXEC_STATUS_REPORT;
-    } else if ( c == CMD_CYCLE_START ){
-      sys.execute |= EXEC_CYCLE_START;
-    } else if ( c == CMD_FEED_HOLD ) {
-      sys.execute |= EXEC_FEED_HOLD;
-    } else if ( c == CMD_RESET ) {
-      mc_reset();
-    } else if (iscomment) {
-      // Throw away all comment characters
-      if (c == ')') {
-        // End of comment. Resume line.
-        iscomment = false;
-      }
-    } else if (c <= ' ') {
-      // Throw away whitepace and control characters todo: implement backspace
-    } else if (c == '/') {
-      // Block delete not supported. Ignore character.
-    } else if (c == '(') {
-      // Enable comments flag and ignore all characters until ')' or EOL.
-      iscomment = true;
-    } else if (char_counter >= LINE_BUFFER_SIZE-1) {
-      // Throw away any characters beyond the end of the line buffer
-    } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
-      line[char_counter++] = c-'a'+'A';
     } else {
-      line[char_counter++] = c;
+      if (iscomment) {
+        // Throw away all comment characters
+        if (c == ')') {
+          // End of comment. Resume line.
+          iscomment = false;
+        }
+      } else {
+        if (c <= ' ') {
+          // Throw away whitepace and control characters
+        } else if (c == '/') {
+          // Block delete not supported. Ignore character.
+        } else if (c == '(') {
+          // Enable comments flag and ignore all characters until ')' or EOL.
+          iscomment = true;
+        } else if (char_counter >= LINE_BUFFER_SIZE-1) {
+          // Throw away any characters beyond the end of the line buffer
+        } else if (c >= 'a' && c <= 'z') { // Upcase lowercase
+          line[char_counter++] = c-'a'+'A';
+        } else {
+          line[char_counter++] = c;
+        }
+      }
     }
   }
 }
-
