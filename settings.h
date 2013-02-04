@@ -42,7 +42,7 @@
 // NOTE: The Atmega328p has 1KB EEPROM. The upper half is reserved for parameters and
 // the startup script. The lower half contains the global settings and space for future 
 // developments.
-#define EEPROM_ADDR_GLOBAL 1
+#define EEPROM_ADDR_GLOBAL 8 //ARM: 8 bytes are for version number + CRC uint32
 #define EEPROM_ADDR_PARAMETERS 512
 #define EEPROM_ADDR_STARTUP_BLOCK 768
 
@@ -57,22 +57,22 @@
 // Global persistent settings (Stored from byte EEPROM_ADDR_GLOBAL onwards)
 typedef struct {
   float steps_per_mm[N_AXIS];
-  uint8_t microsteps;
-  uint8_t pulse_microseconds;
+  uint32_t microsteps;
+  uint32_t pulse_microseconds;
   float default_feed_rate;
   float default_seek_rate;
-  uint8_t invert_mask;
+  uint32_t invert_mask;
   float arc_tolerance;
   float acceleration[N_AXIS];
   float junction_deviation;
-  uint8_t flags;  // Contains default boolean settings
-  uint8_t homing_dir_mask;
+  uint32_t flags;  // Contains default boolean settings
+  uint32_t homing_dir_mask;
   float homing_feed_rate;
   float homing_seek_rate;
-  uint16_t homing_debounce_delay;
+  uint32_t homing_debounce_delay;
   float homing_pulloff;
-  uint8_t stepper_idle_lock_time; // If max value 255, steppers do not disable.
-  uint8_t decimal_places;
+  uint32_t stepper_idle_lock_time; // If max value 255, steppers do not disable.
+  uint32_t decimal_places;
   float max_velocity[N_AXIS];
 //  float mm_soft_limit[N_AXIS];
 //  uint8_t status_report_mask; // Mask to indicate desired report data.

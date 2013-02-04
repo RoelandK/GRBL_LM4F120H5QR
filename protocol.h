@@ -21,7 +21,11 @@
 #ifndef protocol_h
 #define protocol_h
 
-#include <avr/sleep.h>
+#include <stdint.h>
+
+#ifndef PART_LM4F120H5QR // code for AVR
+	#include <avr/sleep.h>
+#endif
 
 // Line buffer size from the serial input stream to be executed.
 // NOTE: Not a problem except for extreme cases, but the line buffer size can be too small
@@ -30,7 +34,7 @@
 // memory space we can invest into here or we re-write the g-code parser not to have his 
 // buffer.
 #ifndef LINE_BUFFER_SIZE
-  #define LINE_BUFFER_SIZE 50
+  #define LINE_BUFFER_SIZE 64 /// must be a multiple of 4 for ARM (because of EEPROM limitations...)
 #endif
 
 // Initialize the serial protocol

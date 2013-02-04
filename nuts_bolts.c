@@ -19,13 +19,19 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <util/delay.h>
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "driverlib/sysctl.h"
+#else // code for AVR
+  #include <util/delay.h>
+#endif
+
 #include "nuts_bolts.h"
 #include "gcode.h"
 #include "planner.h"
 
 #define MAX_INT_DIGITS 8 // Maximum number of digits in int32 (and float)
-extern float __floatunsisf (unsigned long);
+///extern float __floatunsisf (unsigned long);
 
 // Extracts a floating point value from a string. The following code is based loosely on
 // the avr-libc strtod() function by Michael Stumpf and Dmitry Xmelkov and many freely
@@ -79,7 +85,8 @@ int read_float(char *line, uint8_t *char_counter, float *float_ptr)
   
   // Convert integer into floating point.
   float fval;
-  fval = __floatunsisf(intval);
+  ///fval = __floatunsisf(intval);
+  fval = (float) intval; ///maybe this is more simple?
   
   // Apply decimal. Should perform no more than two floating point multiplications for the
   // expected range of E0 to E-4.
@@ -114,7 +121,11 @@ int read_float(char *line, uint8_t *char_counter, float *float_ptr)
 // which only accepts constants in future compiler releases.
 void delay_ms(uint16_t ms) 
 {
-  while ( ms-- ) { _delay_ms(1); }
+	#ifdef PART_LM4F120H5QR
+	  SysCtlDelay( F_CPU / 3000 * ms );
+	#else // code for AVR
+    while ( ms-- ) { _delay_ms(1); }
+	#endif
 }
 
 
@@ -123,21 +134,25 @@ void delay_ms(uint16_t ms)
 // efficiently with larger delays, as the counter adds parasitic time in each iteration.
 void delay_us(uint32_t us) 
 {
-  while (us) {
-    if (us < 10) { 
-      _delay_us(1);
-      us--;
-    } else if (us < 100) {
-      _delay_us(10);
-      us -= 10;
-    } else if (us < 1000) {
-      _delay_us(100);
-      us -= 100;
-    } else {
-      _delay_ms(1);
-      us -= 1000;
+	#ifdef PART_LM4F120H5QR
+	  SysCtlDelay( F_CPU / 3000000 * us );
+	#else // code for AVR
+    while (us) {
+      if (us < 10) { 
+        _delay_us(1);
+        us--;
+      } else if (us < 100) {
+        _delay_us(10);
+        us -= 10;
+      } else if (us < 1000) {
+        _delay_us(100);
+        us -= 100;
+      } else {
+        _delay_ms(1);
+        us -= 1000;
+      }
     }
-  }
+  #endif
 }
 
 // Syncs all internal position vectors to the current system position.

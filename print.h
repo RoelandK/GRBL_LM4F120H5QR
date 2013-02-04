@@ -27,7 +27,14 @@
 
 void printString(const char *s);
 
-void printPgmString(const char *s);
+#ifdef PART_LM4F120H5QR
+  // ARM code
+  #define printPgmString(a) printString(a)
+#else
+  // AVR code
+  #define printPgmString(a) _printPgmString(PSTR(a))
+  void _printPgmString(const char *s);
+#endif
 
 void printInteger(long n);
 

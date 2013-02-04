@@ -22,6 +22,8 @@
 #ifndef planner_h
 #define planner_h
                  
+#include <inttypes.h>
+
 // The number of linear motions that can be in the plan at any give time
 #ifndef BLOCK_BUFFER_SIZE
   #define BLOCK_BUFFER_SIZE 18
@@ -32,7 +34,8 @@
 typedef struct {
 
   // Fields used by the bresenham algorithm for tracing the line
-  uint8_t  direction_bits;            // The direction bit set for this block (refers to *_DIRECTION_BIT in config.h)
+  // Using 32-bin vars istead of 8-bit to avoid LM4F120 issue about non-word-aligned addresses of 32-bit vars
+  uint32_t  direction_bits;            // The direction bit set for this block (refers to *_DIRECTION_BIT in config.h) ///todo: check compatibility
   uint32_t steps_x, steps_y, steps_z; // Step count along each axis
   int32_t  step_event_count;          // The number of step events required to complete this block
 
@@ -42,7 +45,7 @@ typedef struct {
   float max_entry_speed_sqr;         // Maximum allowable junction entry speed in mm/min
   float millimeters;                 // The total travel of this block in mm
   float acceleration;
-  uint8_t recalculate_flag;          // Planner flag to recalculate trapezoids on entry junction
+  uint32_t recalculate_flag;          // Planner flag to recalculate trapezoids on entry junction ///todo: check compatibility
 
   // Settings for the trapezoid generator
   uint32_t initial_rate;              // The step rate at start of block  

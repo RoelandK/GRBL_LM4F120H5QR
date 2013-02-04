@@ -52,8 +52,8 @@
 #define bit_true(x,mask) (x |= mask)
 #define bit_false(x,mask) (x &= ~mask)
 #define bit_toggle(x,mask) (x ^= mask)
-#define bit_istrue(x,mask) ((x & mask) != 0)
-#define bit_isfalse(x,mask) ((x & mask) == 0)
+#define bit_istrue(x,mask) (x & mask)
+#define bit_isfalse(x,mask) (!(x & mask))
 
 // Define system executor bit map. Used internally by runtime protocol as runtime command flags, 
 // which notifies the main program to execute the specified runtime command asynchronously.
@@ -87,9 +87,10 @@ typedef struct {
   uint8_t abort;                 // System abort flag. Forces exit back to main loop for reset.
   uint8_t state;                 // Tracks the current state of Grbl.
   volatile uint8_t execute;      // Global system runtime executor bitflag variable. See EXEC bitmasks.
+  //replaced position of auto_start to avoid LM4F120 issue with non-word-aligned addressing of 16-bit and 32-bit variables
+  uint8_t auto_start;            // Planner auto-start flag. Toggled off during feed hold. Defaulted by settings.
   int32_t position[N_AXIS];      // Real-time machine (aka home) position vector in steps. 
                                  // NOTE: This may need to be a volatile variable, if problems arise.   
-  uint8_t auto_start;            // Planner auto-start flag. Toggled off during feed hold. Defaulted by settings.
 } system_t;
 extern system_t sys;
 

@@ -20,8 +20,15 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
-#include <util/delay.h>
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "driverlib/gpio.h"
+  #include "inc/hw_memmap.h"
+#else // code for AVR
+  #include <avr/io.h>
+  #include <util/delay.h>
+#endif
+
 #include <math.h>
 #include <stdlib.h>
 #include "settings.h"
@@ -35,6 +42,10 @@
 #include "planner.h"
 #include "limits.h"
 #include "protocol.h"
+
+#ifndef M_PI
+  #define M_PI 3.14159265358979323846
+#endif
 
 // Execute linear motion in absolute millimeter coordinates. Feed rate given in millimeters/second
 // unless invert_feed_rate is true. Then the feed_rate means that the motion should be completed in
@@ -223,7 +234,12 @@ void mc_dwell(float seconds)
 void mc_go_home()
 {
   sys.state = STATE_HOMING; // Set system state variable
-  LIMIT_PCMSK &= ~LIMIT_MASK; // Disable hard limits pin change register for cycle duration
+  
+  #ifdef PART_LM4F120H5QR // code for ARM
+    GPIOPinIntDisable( LIMIT_PORT, LIMIT_MASK ); //disable interrupt on pin value change
+  #else // code for AVR
+    LIMIT_PCMSK &= ~LIMIT_MASK; // Disable hard limits pin change register for cycle duration
+  #endif
   
   limits_go_home(); // Perform homing routine.
   if (sys.abort) { return; } // Did not complete. Alarm state set by mc_alarm.
@@ -260,7 +276,13 @@ void mc_go_home()
   sys_sync_current_position();
 
   // If hard limits feature enabled, re-enable hard limits pin change register after homing cycle.
-  if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) { LIMIT_PCMSK |= LIMIT_MASK; }
+  if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) {
+    #ifdef PART_LM4F120H5QR // code for ARM
+      GPIOPinIntEnable( LIMIT_PORT, LIMIT_MASK ); //enable interrupt on pin value change
+    #else // code for AVR
+      LIMIT_PCMSK |= LIMIT_MASK;
+    #endif
+  }
   // Finished! 
 }
 

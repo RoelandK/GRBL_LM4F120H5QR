@@ -22,8 +22,12 @@
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
    used to be a part of the Arduino project. */ 
 
+#ifdef PART_LM4F120H5QR
+  #include "inc/hw_types.h"
+#else
+  #include <avr/pgmspace.h>
+#endif
 
-#include <avr/pgmspace.h>
 #include "config.h"
 #include "serial.h"
 #include "settings.h"
@@ -34,13 +38,15 @@ void printString(const char *s)
     serial_write(*s++);
 }
 
+#ifndef PART_LM4F120H5QR // AVR code
 // Print a string stored in PGM-memory
-void printPgmString(const char *s)
+void _printPgmString(const char *s)
 {
   char c;
   while ((c = pgm_read_byte_near(s++)))
     serial_write(c);
 }
+#endif
 
 // void printIntegerInBase(unsigned long n, unsigned long base)
 // { 
@@ -130,14 +136,17 @@ void printFloat(float n)
   uint8_t i = 0;
   uint32_t a = (long)n;  
   buf[settings.decimal_places] = '.'; // Place decimal point, even if decimal places are zero.
+
   while(a > 0) {
     if (i == settings.decimal_places) { i++; } // Skip decimal point location
     buf[i++] = (a % 10) + '0'; // Get digit
     a /= 10;
   }
+
   while (i < settings.decimal_places) { 
      buf[i++] = '0'; // Fill in zeros to decimal point for (n < 1)
   }
+
   if (i == settings.decimal_places) { // Fill in leading zero, if needed.
     i++;
     buf[i++] = '0'; 

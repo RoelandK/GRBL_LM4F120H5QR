@@ -22,7 +22,7 @@
 
 /* The ring buffer implementation gleaned from the wiring_serial library by David A. Mellis. */
 
-#include <inttypes.h>    
+#include <inttypes.h>
 #include <stdlib.h>
 #include "planner.h"
 #include "nuts_bolts.h"
@@ -49,8 +49,8 @@ typedef struct {
   float previous_nominal_speed_sqr;  // Nominal speed of previous path line segment
   float last_x, last_y, last_z;      // Target position of previous path line segment
 } planner_t;
-static planner_t pl;
 
+static planner_t pl;
 
 // Returns the index of the next block in the ring buffer
 // NOTE: Removed modulo (%) operator, which uses an expensive divide and multiplication.

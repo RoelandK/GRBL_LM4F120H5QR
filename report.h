@@ -47,6 +47,8 @@
 #define MESSAGE_ENABLED 4
 #define MESSAGE_DISABLED 5
 
+#include <stdint.h>
+
 // Prints system status messages.
 void report_status_message(uint8_t status_code);
 

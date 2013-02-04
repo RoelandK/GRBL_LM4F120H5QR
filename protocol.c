@@ -19,8 +19,18 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
+
+  void pinout_interrupt( void ); //declaration
+#else // code for AVR
+  #include <avr/io.h>
+  #include <avr/interrupt.h>
+#endif
+
 #include "protocol.h"
 #include "gcode.h"
 #include "serial.h"
@@ -41,12 +51,23 @@ void protocol_init()
 {
   char_counter = 0; // Reset line input
   iscomment = false;
-  report_init_message(); // Welcome message   
-  
+  report_init_message(); // Welcome message
+
+#ifdef PART_LM4F120H5QR // code for ARM
+  SysCtlPeripheralEnable( PINOUT_PERIPH ); ///Enable the GPIO module for PINOUT port
+  SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+
+  GPIOPinTypeGPIOInput( PINOUT_PORT, PINOUT_MASK ); // Set as input pins
+  GPIOPadConfigSet( PINOUT_PORT, PINOUT_MASK, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU); //Enable weak pull-ups
+  GPIOPortIntRegister( PINOUT_PORT, pinout_interrupt ); //register a call-back funcion for interrupt
+  GPIOIntTypeSet( PINOUT_PORT, PINOUT_MASK, GPIO_BOTH_EDGES ); // Enable specific pins of the Pin Change Interrupt
+  GPIOPinIntEnable( PINOUT_PORT, PINOUT_MASK ); // Enable Pin Change Interrupt
+#else // code for AVR
   PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
   PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
   PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
   PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
+#endif
 }
 
 // Executes user startup script, if stored.
@@ -69,7 +90,26 @@ void protocol_execute_startup()
 // only the runtime command execute variable to have the main program execute these when 
 // its ready. This works exactly like the character-based runtime commands when picked off
 // directly from the incoming serial data stream.
-ISR(PINOUT_INT_vect) 
+#ifdef PART_LM4F120H5QR
+// ARM code
+void pinout_interrupt( void ) {
+  GPIOPinIntClear( PINOUT_PORT, PINOUT_MASK ); ///clear interrupt flag
+
+  if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_RESET ) ) {
+    mc_reset();
+
+  } else if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_FEED_HOLD ) ) {
+    sys.execute |= EXEC_FEED_HOLD;
+
+  } else if ( !GPIOPinRead( PINOUT_PORT, 1 << PIN_CYCLE_START ) ) {
+    sys.execute |= EXEC_CYCLE_START;
+  }
+}
+#endif
+
+#ifndef PART_LM4F120H5QR
+// AVR code
+ISR(PINOUT_INT_vect)
 {
   // Enter only if any pinout pin is actively low.
   if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) { 
@@ -82,6 +122,7 @@ ISR(PINOUT_INT_vect)
     }
   }
 }
+#endif
 
 // Executes run-time commands, when required. This is called from various check points in the main
 // program, primarily where there may be a while loop waiting for a buffer to clear space or any
@@ -180,7 +221,8 @@ uint8_t protocol_execute_line(char *line)
     
     uint8_t char_counter = 1; 
     uint8_t helper_var = 0; // Helper variable
-    float parameter, value;
+    float parameter = 0.0;
+    float value = 0.0;
     switch( line[char_counter] ) {
       case 0 : report_grbl_help(); break;
       case '$' : // Prints Grbl settings

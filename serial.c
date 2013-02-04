@@ -22,19 +22,31 @@
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
    used to be a part of the Arduino project. */ 
 
-#include <avr/interrupt.h>
+#if defined( PART_LM4F120H5QR ) // code for ARM
+  #include "inc/hw_memmap.h"
+  #include "inc/hw_types.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/uart.h"
+  #include "driverlib/interrupt.h"
+  #include "driverlib/pin_map.h"
+  #include "driverlib/gpio.h"
+  #include "inc/hw_ints.h"
+#else // code for AVR
+  #include <avr/interrupt.h>
+#endif
+
 #include "serial.h"
 #include "config.h"
 #include "motion_control.h"
 #include "protocol.h"
 
 uint8_t rx_buffer[RX_BUFFER_SIZE];
-uint8_t rx_buffer_head = 0;
-uint8_t rx_buffer_tail = 0;
+volatile uint8_t rx_buffer_head;
+volatile uint8_t rx_buffer_tail;
 
 uint8_t tx_buffer[TX_BUFFER_SIZE];
-uint8_t tx_buffer_head = 0;
-volatile uint8_t tx_buffer_tail = 0;
+volatile uint8_t tx_buffer_head;
+volatile uint8_t tx_buffer_tail;
 
 #ifdef ENABLE_XONXOFF
   volatile uint8_t flow_ctrl = XON_SENT; // Flow control state variable
@@ -49,27 +61,85 @@ volatile uint8_t tx_buffer_tail = 0;
   }
 #endif
 
+inline uint8_t receive_buffer_empty() {
+  return rx_buffer_head == rx_buffer_head;
+}
+
+inline uint8_t transmit_buffer_empty() {
+  return tx_buffer_head == tx_buffer_tail;
+}
+
+#ifdef PART_LM4F120H5QR
+//ARM code
+void arm_uart_receive_data( void );
+void arm_uart_send_data( void );
+
+void arm_uart_interrupt_handler( void ) {
+  //clear interrupt flag
+  unsigned long ul = UARTIntStatus( UART0_BASE, true );
+  UARTIntClear( UART0_BASE, ul );
+
+  //receive chars if any
+  while ( UARTCharsAvail( UART0_BASE) ) arm_uart_receive_data();
+
+  //transmit characters if possible
+  while ( UARTSpaceAvail( UART0_BASE ) && !transmit_buffer_empty() ) arm_uart_send_data();
+
+  //if nothing to transmit, then switch off transmit interrupt, otherwise enable TX interrupt
+  if ( !UARTBusy( UART0_BASE ) && transmit_buffer_empty() ) {
+    UARTIntDisable( UART0_BASE, UART_INT_TX );
+  } else {
+    UARTIntEnable( UART0_BASE, UART_INT_TX );
+  }
+}
+#endif
+
 void serial_init()
 {
+  rx_buffer_head = rx_buffer_tail = 0;
+  tx_buffer_head = tx_buffer_tail = 0;
+  
+#ifdef PART_LM4F120H5QR //code for ARM
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA ); //enable pins which correspond to RxD and TxD signals
+  SysCtlDelay( 26 ); // Delay 1usec for peripherial to start
+  GPIOPinConfigure( GPIO_PA0_U0RX ); //configure pin to be RxD of UART0
+  GPIOPinConfigure( GPIO_PA1_U0TX ); //configure pin to be TxD of UART0
+  GPIOPinTypeUART( GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1 ); //configure pins 0 and 1 of PORTA to be RxD and TxD
+
+  SysCtlPeripheralEnable( SYSCTL_PERIPH_UART0 ); // Enable the UART0 peripheral for use.
+  SysCtlDelay( 26 ); // Delay 1usec for peripherial to start
+  UARTConfigSetExpClk( UART0_BASE, SysCtlClockGet(), 115200, UART_CONFIG_WLEN_8 | UART_CONFIG_PAR_NONE | UART_CONFIG_STOP_ONE ); //115200 baud, 8-N-1
+
+  UARTFIFOLevelSet( UART0_BASE, UART_FIFO_TX1_8, UART_FIFO_RX1_8 ); //Interrupt if TX FIFO is almost empty or any character is received.
+  UARTIntDisable( UART0_BASE, 0xFFFFFFFF ); // Disable all interrupt sources for UART0 module
+  UARTIntEnable( UART0_BASE, UART_INT_RX | UART_INT_RT ); //Enable only receive interrupts
+  UARTIntRegister( UART0_BASE, arm_uart_interrupt_handler );
+  IntPrioritySet( INT_UART0, 64 ); // lowest priority for UART interrupts
+  IntEnable( INT_UART0 ); //Enable UART0 interrupts in the NVIC
+  UARTEnable( UART0_BASE ); //Enable UART0 to work
+
+#else //code for AVR
   // Set baud rate
   #if BAUD_RATE < 57600
     uint16_t UBRR0_value = ((F_CPU / (8L * BAUD_RATE)) - 1)/2 ;
-    UCSR0A &= ~(1 << U2X0); // baud doubler off  - Only needed on Uno XXX
+    UCSR0A &= ~(1 << U2X0); // baud doubler off  - Only needed on Uno XX
   #else
     uint16_t UBRR0_value = ((F_CPU / (4L * BAUD_RATE)) - 1)/2;
     UCSR0A |= (1 << U2X0);  // baud doubler on for high baud rates, i.e. 115200
   #endif
   UBRR0H = UBRR0_value >> 8;
   UBRR0L = UBRR0_value;
-            
+
   // enable rx and tx
   UCSR0B |= 1<<RXEN0;
   UCSR0B |= 1<<TXEN0;
-	
+
   // enable interrupt on complete reception of a byte
   UCSR0B |= 1<<RXCIE0;
-	  
+
   // defaults to 8-bit, no parity, 1 stop bit
+
+#endif //for ARM
 }
 
 void serial_write(uint8_t data) {
@@ -86,17 +156,34 @@ void serial_write(uint8_t data) {
   tx_buffer[tx_buffer_head] = data;
   tx_buffer_head = next_head;
   
+#ifdef PART_LM4F120H5QR // code for ARM
+  arm_uart_interrupt_handler();
+#else // code for AVR
   // Enable Data Register Empty Interrupt to make sure tx-streaming is running
-  UCSR0B |=  (1 << UDRIE0); 
+  UCSR0B |=  (1 << UDRIE0);
+#endif
 }
 
 // Data Register Empty Interrupt handler
-#ifdef __AVR_ATmega644P__
-ISR(USART0_UDRE_vect)
+#if defined( PART_LM4F120H5QR )
+  void arm_uart_send_data( void )
+#elif defined( __AVR_ATmega644P__ )
+  ISR(USART0_UDRE_vect)
 #else
-ISR(USART_UDRE_vect)
+  ISR(USART_UDRE_vect)
 #endif
 {
+  if ( transmit_buffer_empty() ) {
+    #ifdef PART_LM4F120H5QR
+      UARTIntDisable( UART0_BASE, UART_INT_TX );
+    #else
+      // AVR code
+      // Turn off Data Register Empty Interrupt to stop tx-streaming if this concludes the transfer
+      if (tail == tx_buffer_head) { UCSR0B &= ~(1 << UDRIE0); }
+    #endif
+    return;
+  }
+  
   // Temporary tx_buffer_tail (to optimize for volatile)
   uint8_t tail = tx_buffer_tail;
   
@@ -110,8 +197,14 @@ ISR(USART_UDRE_vect)
     } else
   #endif
   { 
-    // Send a byte from the buffer	
-    UDR0 = tx_buffer[tail];
+    // Send a byte from the buffer
+    #if defined( PART_LM4F120H5QR )
+      // ARM code
+      UARTCharPutNonBlocking( UART0_BASE, tx_buffer[ tail ] );
+    #else
+      // AVR code
+      UDR0 = tx_buffer[tail];
+    #endif
   
     // Update tail position
     tail++;
@@ -119,9 +212,6 @@ ISR(USART_UDRE_vect)
   
     tx_buffer_tail = tail;
   }
-  
-  // Turn off Data Register Empty Interrupt to stop tx-streaming if this concludes the transfer
-  if (tail == tx_buffer_head) { UCSR0B &= ~(1 << UDRIE0); }
 }
 
 uint8_t serial_read()
@@ -144,13 +234,23 @@ uint8_t serial_read()
   }
 }
 
-#ifdef __AVR_ATmega644P__
+// UART Receive Interrupt handler
+#if defined( PART_LM4F120H5QR )
+void arm_uart_receive_data( void )
+#elif defined( __AVR_ATmega644P__ )
 ISR(USART0_RX_vect)
 #else
 ISR(USART_RX_vect)
 #endif
 {
+
+#if defined( PART_LM4F120H5QR ) // code for ARM
+  uint8_t data = (uint8_t)( UARTCharGetNonBlocking( UART0_BASE ) & 0xFF ); //read a char and remove control bits (highest)
+  serial_write( data ); //echo
+#else // code for AVR
   uint8_t data = UDR0;
+#endif
+
   uint8_t next_head;
   
   // Pick off runtime command characters directly from the serial stream. These characters are

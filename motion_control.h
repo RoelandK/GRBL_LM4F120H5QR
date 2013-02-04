@@ -22,7 +22,6 @@
 #ifndef motion_control_h
 #define motion_control_h
 
-#include <avr/io.h>
 #include "planner.h"
 
 // Execute linear motion in absolute millimeter coordinates. Feed rate given in millimeters/second
