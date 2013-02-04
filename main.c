@@ -23,8 +23,20 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
+#ifdef PART_LM4F120H5QR
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "inc/hw_ints.h"
+  #include "driverlib/pin_map.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
+  #include "driverlib/fpu.h"
+  #include "driverlib/interrupt.h"
+#else
+  #include <avr/interrupt.h>
+  #include <avr/pgmspace.h>
+#endif
+
 #include "config.h"
 #include "planner.h"
 #include "nuts_bolts.h"
@@ -44,11 +56,22 @@ system_t sys;
 
 int main(void)
 {
+#ifdef PART_LM4F120H5QR // ARM code
+  SysCtlClockSet( SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN ); //set system clock to 80 MHz
+  FPUEnable(); //enable the Floating Point Unit
+//  FPULazyStackingEnable(); // Enable stacking for interrupt handlers
+#endif
+
   // Initialize system
   serial_init(); // Setup serial baud rate and interrupts
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
+
+#ifdef PART_LM4F120H5QR // ARM code
+  IntMasterEnable();
+#else // AVR code
   sei(); // Enable interrupts
+#endif
   
   memset(&sys, 0, sizeof(sys));  // Clear all system variables
   sys.abort = true;   // Set abort to complete initialization
@@ -109,5 +132,5 @@ int main(void)
     if (sys.auto_start) { st_cycle_start(); }
     
   }
-  return 0;   /* never reached */
+  // return 0;   /* never reached */
 }

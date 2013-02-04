@@ -204,7 +204,7 @@ uint8_t gc_execute_line(char *line)
   /* Pass 2: Parameters. All units converted according to current block commands. Position 
      parameters are converted and flagged to indicate a change. These can have multiple connotations
      for different commands. Each will be converted to their proper value upon execution. */
-  float p = 0, r = 0;
+  float p = 0.0, r = 0.0;
   uint8_t l = 0;
   char_counter = 0;
   while(next_statement(&letter, &value, line, &char_counter)) {
@@ -277,6 +277,7 @@ uint8_t gc_execute_line(char *line)
         if (sys.state != STATE_CHECK_MODE) { mc_dwell(p); }
       }
       break;
+
     case NON_MODAL_SET_COORDINATE_DATA:
       int_value = trunc(p); // Convert p value to int.
       if ((l != 2 && l != 20) || (int_value < 1 || int_value > N_COORDINATE_SYSTEM)) { // L2 and L20. P1=G54, P2=G55, ... 
@@ -304,6 +305,7 @@ uint8_t gc_execute_line(char *line)
       }
       axis_words = 0; // Axis words used. Lock out from motion modes by clearing flags.
       break;
+
     case NON_MODAL_GO_HOME_0: case NON_MODAL_GO_HOME_1: 
       // Move to intermediate position before going home. Obeys current coordinate system and offsets 
       // and absolute and incremental modes.
@@ -332,11 +334,13 @@ uint8_t gc_execute_line(char *line)
       memcpy(gc.position, coord_data, sizeof(coord_data)); // gc.position[] = coord_data[];
       axis_words = 0; // Axis words used. Lock out from motion modes by clearing flags.
       break;
+
     case NON_MODAL_SET_HOME_0: case NON_MODAL_SET_HOME_1:
       home_select = SETTING_INDEX_G28;
       if (non_modal_action == NON_MODAL_SET_HOME_1) { home_select = SETTING_INDEX_G30; }
       settings_write_coord_data(home_select,gc.position);
       break;
+
     case NON_MODAL_SET_COORDINATE_OFFSET:
       if (!axis_words) { // No axis words
         FAIL(STATUS_INVALID_STATEMENT);
@@ -352,6 +356,7 @@ uint8_t gc_execute_line(char *line)
       }
       axis_words = 0; // Axis words used. Lock out from motion modes by clearing flags.
       break;
+      
     case NON_MODAL_RESET_COORDINATE_OFFSET: 
       clear_vector(gc.coord_offset); // Disable G92 offsets by zeroing offset vector.
       break;

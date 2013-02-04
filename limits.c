@@ -18,10 +18,17 @@
   You should have received a copy of the GNU General Public License
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
-  
-#include <util/delay.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
+#else // code for AVR
+  #include <util/delay.h>
+  #include <avr/io.h>
+  #include <avr/interrupt.h>
+#endif
+
 #include "stepper.h"
 #include "settings.h"
 #include "nuts_bolts.h"
@@ -35,16 +42,38 @@
 
 #define MICROSECONDS_PER_ACCELERATION_TICK  (1000000/ACCELERATION_TICKS_PER_SECOND)
 
+#ifdef PART_LM4F120H5QR // code for ARM
+	void limit_interrupt( void );
+#endif
+
 void limits_init() 
 {
-  LIMIT_DDR &= ~(LIMIT_MASK); // Set as input pins
-  LIMIT_PORT |= (LIMIT_MASK); // Enable internal pull-up resistors. Normal high operation.
+	#ifdef PART_LM4F120H5QR // code for ARM
+    SysCtlPeripheralEnable( LIMIT_PERIPH );
+    SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+    GPIOPinTypeGPIOInput( LIMIT_PORT, LIMIT_MASK );
+    GPIOPadConfigSet( LIMIT_PORT, LIMIT_MASK, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU); //Enable weak pull-ups
+	#else // code for AVR
+    LIMIT_DDR &= ~(LIMIT_MASK); // Set as input pins
+    LIMIT_PORT |= (LIMIT_MASK); // Enable internal pull-up resistors. Normal high operation.
+	#endif
+
   if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) {
-    LIMIT_PCMSK |= LIMIT_MASK; // Enable specific pins of the Pin Change Interrupt
-    PCICR |= (1 << LIMIT_INT); // Enable Pin Change Interrupt
+  	#ifdef PART_LM4F120H5QR // code for ARM
+	    GPIOPortIntRegister( LIMIT_PORT, limit_interrupt ); //register a call-back funcion for interrupt
+      GPIOIntTypeSet( LIMIT_PORT, LIMIT_MASK, GPIO_BOTH_EDGES ); // Enable specific pins of the Pin Change Interrupt
+      GPIOPinIntEnable( LIMIT_PORT, LIMIT_MASK ); // Enable Pin Change Interrupt
+  	#else // code for AVR
+      LIMIT_PCMSK |= LIMIT_MASK; // Enable specific pins of the Pin Change Interrupt
+      PCICR |= (1 << LIMIT_INT); // Enable Pin Change Interrupt
+  	#endif
   } else {
-    LIMIT_PCMSK &= ~LIMIT_MASK; // Disable
-    PCICR &= ~(1 << LIMIT_INT); 
+  	#ifdef PART_LM4F120H5QR // code for ARM
+    	GPIOPinIntDisable( LIMIT_PORT, LIMIT_MASK ); // Enable Pin Change Interrupt
+  	#else // code for AVR
+      LIMIT_PCMSK &= ~LIMIT_MASK; // Disable
+      PCICR &= ~(1 << LIMIT_INT); 
+  	#endif
   }
 }
 
@@ -57,8 +86,16 @@ void limits_init()
 // homing cycles and will not respond correctly. Upon user request or need, there may be a
 // special pinout for an e-stop, but it is generally recommended to just directly connect
 // your e-stop switch to the Arduino reset pin, since it is the most correct way to do this.
-ISR(LIMIT_INT_vect) 
+#ifdef PART_LM4F120H5QR // code for ARM
+  void limit_interrupt( void )
+#else // code for AVR
+  ISR(LIMIT_INT_vect) 
+#endif
 {
+	#ifdef PART_LM4F120H5QR // code for ARM
+    GPIOPinIntClear( LIMIT_PORT, LIMIT_MASK ); ///clear interrupt flag
+  #endif
+
   // TODO: This interrupt may be used to manage the homing cycle directly with the main stepper
   // interrupt without adding too much to it. All it would need is some way to stop one axis 
   // when its limit is triggered and continue the others. This may reduce some of the code, but
@@ -156,7 +193,12 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     out_bits = out_bits0;
     
     // Get limit pin state.
-    limit_state = LIMIT_PIN;
+    #ifdef PART_LM4F120H5QR // code for ARM
+      limit_state = GPIOPinRead( LIMIT_PORT, LIMIT_MASK );
+    #else // code for AVR
+      limit_state = LIMIT_PIN;
+    #endif
+
     if (invert_pin) { limit_state ^= LIMIT_MASK; } // If leaving switch, invert to move.
     
     // Set step pins by Bresenham line algorithm. If limit switch reached, disable and
@@ -191,10 +233,17 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     if (!(cycle_mask) || sys.abort) { return; }
         
     // Perform step.
-    STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (out_bits & STEP_MASK);
-    delay_us(settings.pulse_microseconds);
-    STEPPING_PORT = out_bits0;
-    delay_us(step_delay);
+    #ifdef PART_LM4F120H5QR // code for ARM
+      GPIOPinWrite( STEPPING_PORT, STEP_MASK, out_bits );
+      delay_us(settings.pulse_microseconds);
+      GPIOPinWrite( STEPPING_PORT, STEP_MASK, out_bits0 );
+      delay_us(step_delay);
+    #else // code for AVR
+      STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (out_bits & STEP_MASK);
+      delay_us(settings.pulse_microseconds);
+      STEPPING_PORT = out_bits0;
+      delay_us(step_delay);
+    #endif
     
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 

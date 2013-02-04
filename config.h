@@ -22,37 +22,44 @@
 #ifndef config_h
 #define config_h
 
+#ifndef F_CPU
+	#define F_CPU 80000000 // 80 MHz
+#endif
+
 // IMPORTANT: Any changes here requires a full re-compiling of the source code to propagate them.
 
 // Default settings. Used when resetting EEPROM. Change to desired name in defaults.h
 #define DEFAULTS_GENERIC
 
 // Serial baud rate
-#define BAUD_RATE 9600
+#define BAUD_RATE 9600 /// hardcoded 115200 for ARM LM4F120H5QR devboard
 
 // Define pin-assignments
 // NOTE: All step bit and direction pins must be on the same port.
-#define STEPPING_DDR       DDRD
-#define STEPPING_PORT      PORTD
-#define X_STEP_BIT         2  // Uno Digital Pin 2
-#define Y_STEP_BIT         3  // Uno Digital Pin 3
-#define Z_STEP_BIT         4  // Uno Digital Pin 4
-#define X_DIRECTION_BIT    5  // Uno Digital Pin 5
-#define Y_DIRECTION_BIT    6  // Uno Digital Pin 6
-#define Z_DIRECTION_BIT    7  // Uno Digital Pin 7
+#define STEPPING_PERIPH    SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define STEPPING_DDR       DDRD // AVR only
+#define STEPPING_PORT      GPIO_PORTF_BASE //PORTD for AVR, GPIO_PORTF_BASE for Cortex
+#define X_STEP_BIT         1 // Uno Digital Pin 2
+#define Y_STEP_BIT         2 // Uno Digital Pin 3
+#define Z_STEP_BIT         3 // Uno Digital Pin 4
+#define X_DIRECTION_BIT    5 // Uno Digital Pin 5
+#define Y_DIRECTION_BIT    5 // Uno Digital Pin 6
+#define Z_DIRECTION_BIT    5 // Uno Digital Pin 7
 #define STEP_MASK ((1<<X_STEP_BIT)|(1<<Y_STEP_BIT)|(1<<Z_STEP_BIT)) // All step bits
 #define DIRECTION_MASK ((1<<X_DIRECTION_BIT)|(1<<Y_DIRECTION_BIT)|(1<<Z_DIRECTION_BIT)) // All direction bits
 #define STEPPING_MASK (STEP_MASK | DIRECTION_MASK) // All stepping-related bits (step/direction)
 
-#define STEPPERS_DISABLE_DDR    DDRB
-#define STEPPERS_DISABLE_PORT   PORTB
+#define STEPPERS_DISABLE_PERIPH	SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define STEPPERS_DISABLE_DDR    DDRB // AVR only
+#define STEPPERS_DISABLE_PORT   GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define STEPPERS_DISABLE_BIT    0  // Uno Digital Pin 8
 #define STEPPERS_DISABLE_MASK (1<<STEPPERS_DISABLE_BIT)
 
 // NOTE: All limit bit pins must be on the same port
+#define LIMIT_PERIPH    SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
 #define LIMIT_DDR       DDRB
-#define LIMIT_PIN       PINB
-#define LIMIT_PORT      PORTB
+#define LIMIT_PIN       PINB // AVR only
+#define LIMIT_PORT      GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define X_LIMIT_BIT     1  // Uno Digital Pin 9
 #define Y_LIMIT_BIT     2  // Uno Digital Pin 10
 #define Z_LIMIT_BIT     3  // Uno Digital Pin 11
@@ -61,37 +68,42 @@
 #define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
 #define LIMIT_MASK ((1<<X_LIMIT_BIT)|(1<<Y_LIMIT_BIT)|(1<<Z_LIMIT_BIT)) // All limit bits
 
-#define SPINDLE_ENABLE_DDR   DDRB
-#define SPINDLE_ENABLE_PORT  PORTB
+#define SPINDLE_ENABLE_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_ENABLE_DDR   DDRB // AVR only
+#define SPINDLE_ENABLE_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_ENABLE_BIT   4  // Uno Digital Pin 12
 
-#define SPINDLE_DIRECTION_DDR   DDRB
-#define SPINDLE_DIRECTION_PORT  PORTB
+#define SPINDLE_DIRECTION_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_DIRECTION_DDR   DDRB // AVR only
+#define SPINDLE_DIRECTION_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_DIRECTION_BIT   5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
 
-#define COOLANT_FLOOD_DDR   DDRC
-#define COOLANT_FLOOD_PORT  PORTC
-#define COOLANT_FLOOD_BIT   3  // Uno Analog Pin 3
+#define COOLANT_FLOOD_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define COOLANT_FLOOD_DDR   DDRC // AVR only
+#define COOLANT_FLOOD_PORT  GPIO_PORTE_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
+#define COOLANT_FLOOD_BIT   6  // Uno Analog Pin 3
 
 // NOTE: Uno analog pins 4 and 5 are reserved for an i2c interface, and may be installed at
 // a later date if flash and memory space allows.
 // #define ENABLE_M7  // Mist coolant disabled by default. Uncomment to enable.
 #ifdef ENABLE_M7
-  #define COOLANT_MIST_DDR   DDRC
-  #define COOLANT_MIST_PORT  PORTC
+  #define COOLANT_MIST_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
+  #define COOLANT_MIST_DDR   DDRC // AVR only
+  #define COOLANT_MIST_PORT  GPIO_PORTC_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
   #define COOLANT_MIST_BIT   4 // Uno Analog Pin 4
 #endif  
 
 // NOTE: All pinouts pins must be on the same port
-#define PINOUT_DDR       DDRC
-#define PINOUT_PIN       PINC
-#define PINOUT_PORT      PORTC
-#define PIN_RESET        0  // Uno Analog Pin 0
-#define PIN_FEED_HOLD    1  // Uno Analog Pin 1
-#define PIN_CYCLE_START  2  // Uno Analog Pin 2
-#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin
-#define PINOUT_INT_vect  PCINT1_vect
-#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register
+#define PINOUT_PERIPH    SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define PINOUT_DDR       DDRC // AVR only
+#define PINOUT_PIN       PINC // AVR only
+#define PINOUT_PORT      GPIO_PORTF_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
+#define PIN_RESET        6  // Uno Analog Pin 0
+#define PIN_FEED_HOLD    4  // Uno Analog Pin 1
+#define PIN_CYCLE_START  0  // Uno Analog Pin 2
+#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin, AVR only
+#define PINOUT_INT_vect  PCINT1_vect // ARV only
+#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register, AVR only
 #define PINOUT_MASK ((1<<PIN_RESET)|(1<<PIN_FEED_HOLD)|(1<<PIN_CYCLE_START))
 
 // Define runtime command special characters. These characters are 'picked-off' directly from the

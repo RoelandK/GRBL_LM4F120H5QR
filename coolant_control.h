@@ -21,7 +21,11 @@
 #ifndef coolant_control_h
 #define coolant_control_h 
 
-#include <avr/io.h>
+#include <stdint.h>
+
+#ifndef PART_LM4F120H5QR // code for AVR
+	#include <avr/io.h>
+#endif
 
 #define COOLANT_MIST_ENABLE 2
 #define COOLANT_FLOOD_ENABLE 1
