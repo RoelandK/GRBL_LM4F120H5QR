@@ -89,9 +89,9 @@ uint8_t gc_execute_line(char *line)
   if (sys.state == STATE_ALARM) { return(STATUS_ALARM_LOCK); }
 
   uint8_t char_counter = 0;
-  char letter;
-  float value;
-  int int_value;
+  char letter = 0;
+  float value = 0.0;
+  int int_value = 0;
 
   uint16_t modal_group_words = 0;  // Bitflag variable to track and check modal group words in block
   uint8_t axis_words = 0;          // Bitflag to track which XYZ(ABC) parameters exist in block
@@ -100,9 +100,11 @@ uint8_t gc_execute_line(char *line)
   uint8_t absolute_override = false; // true(1) = absolute motion for this block only {G53}
   uint8_t non_modal_action = NON_MODAL_NONE; // Tracks the actions of modal group 0 (non-modal)
 
-  float target[3], offset[3];
-  clear_vector(target); // XYZ(ABC) axes parameters.
-  clear_vector(offset); // IJK Arc offsets are incremental. Value of zero indicates no change.
+  float target[ 3 ] = { 0.0, 0.0, 0.0 };
+  float offset[ 3 ] = { 0.0, 0.0, 0.0 };
+///  float target[3], offset[3];
+///  clear_vector(target); // XYZ(ABC) axes parameters.
+///  clear_vector(offset); // IJK Arc offsets are incremental. Value of zero indicates no change.
 
   gc.status_code = STATUS_OK;
 
@@ -206,7 +208,7 @@ uint8_t gc_execute_line(char *line)
   /* Pass 2: Parameters. All units converted according to current block commands. Position
      parameters are converted and flagged to indicate a change. These can have multiple connotations
      for different commands. Each will be converted to their proper value upon execution. */
-  float p = 0, r = 0;
+  float p = 0.0, r = 0.0;
   uint8_t l = 0;
   char_counter = 0;
   while(next_statement(&letter, &value, line, &char_counter)) {
@@ -262,11 +264,15 @@ uint8_t gc_execute_line(char *line)
     coolant_run(gc.coolant_mode);
   }
 
+  float coord_data[N_AXIS] = { 0.0, 0.0, 0.0 };
+  char k;
+
   // [G54,G55,...,G59]: Coordinate system selection
   if ( bit_istrue(modal_group_words,bit(MODAL_GROUP_12)) ) { // Check if called in block
-    float coord_data[N_AXIS];
+///    float coord_data[N_AXIS] = { 0.0, 0.0, 0.0 };
     if (!(settings_read_coord_data(gc.coord_select,coord_data))) { return(STATUS_SETTING_READ_FAIL); }
-    memcpy(gc.coord_system,coord_data,sizeof(coord_data));
+///    memcpy(gc.coord_system,coord_data,sizeof(coord_data));
+    for ( k = 0; k < N_AXIS; k++ ) gc.coord_system[ k ] = coord_data[ k ];
   }
 
   uint8_t home_select = 0;
@@ -295,9 +301,12 @@ uint8_t gc_execute_line(char *line)
         if (l == 20) {
           settings_write_coord_data(int_value,gc.position);
           // Update system coordinate system if currently active.
-          if (gc.coord_select == int_value) { memcpy(gc.coord_system,gc.position,sizeof(gc.position)); }
+          if (gc.coord_select == int_value) {
+            ///memcpy(gc.coord_system,gc.position,sizeof(gc.position));
+            for ( k = 0; k < N_AXIS; k++ ) gc.coord_system[ k ] = gc.position[ k ];
+          }
         } else {
-          float coord_data[N_AXIS];
+          ///float coord_data[N_AXIS] = { 0.0, 0.0, 0.0 };
           if (!settings_read_coord_data(int_value,coord_data)) { return(STATUS_SETTING_READ_FAIL); }
           // Update axes defined only in block. Always in machine coordinates. Can change non-active system.
           uint8_t i;
@@ -306,7 +315,10 @@ uint8_t gc_execute_line(char *line)
           }
           settings_write_coord_data(int_value,coord_data);
           // Update system coordinate system if currently active.
-          if (gc.coord_select == int_value) { memcpy(gc.coord_system,coord_data,sizeof(coord_data)); }
+          if (gc.coord_select == int_value) {
+            ///memcpy(gc.coord_system,coord_data,sizeof(coord_data));
+            for ( k = 0; k < N_AXIS; k++ ) gc.coord_system[ k ] = coord_data[ k ];
+          }
         }
       }
       axis_words = 0; // Axis words used. Lock out from motion modes by clearing flags.
@@ -332,13 +344,13 @@ uint8_t gc_execute_line(char *line)
         mc_line(target[X_AXIS], target[Y_AXIS], target[Z_AXIS], settings.default_seek_rate, false);
       }
       // Retreive G28/30 go-home position data (in machine coordinates) from EEPROM
-      float coord_data[N_AXIS];
-      ///uint8_t home_select = SETTING_INDEX_G28;
+      ///float coord_data[N_AXIS] = { 0.0, 0.0, 0.0 };
       home_select = SETTING_INDEX_G28;
       if (non_modal_action == NON_MODAL_GO_HOME_1) { home_select = SETTING_INDEX_G30; }
       if (!settings_read_coord_data(home_select,coord_data)) { return(STATUS_SETTING_READ_FAIL); }
       mc_line(coord_data[X_AXIS], coord_data[Y_AXIS], coord_data[Z_AXIS], settings.default_seek_rate, false);
-      memcpy(gc.position, coord_data, sizeof(coord_data)); // gc.position[] = coord_data[];
+      ///memcpy(gc.position, coord_data, sizeof(coord_data)); // gc.position[] = coord_data[];
+      for ( k = 0; k < N_AXIS; k++ ) gc.position[ k ] = coord_data[ k ];
       axis_words = 0; // Axis words used. Lock out from motion modes by clearing flags.
       break;
 
@@ -545,7 +557,8 @@ uint8_t gc_execute_line(char *line)
     // As far as the parser is concerned, the position is now == target. In reality the
     // motion control system might still be processing the action and the real tool position
     // in any intermediate location.
-    memcpy(gc.position, target, sizeof(target)); // gc.position[] = target[];
+    ///memcpy(gc.position, target, sizeof(target)); // gc.position[] = target[];
+    for ( k = 0; k < N_AXIS; k++ ) gc.position[ k ] = target[ k ];
   }
 
   // M0,M1,M2,M30: Perform non-running program flow actions. During a program pause, the buffer may

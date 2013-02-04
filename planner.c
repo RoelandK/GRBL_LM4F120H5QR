@@ -44,6 +44,7 @@ typedef struct {
   float previous_unit_vec[3];     // Unit vector of previous path line segment
   float previous_nominal_speed;   // Nominal speed of previous path line segment
 } planner_t;
+
 static planner_t pl;
 
 // Returns the index of the next block in the ring buffer
@@ -463,7 +464,9 @@ void plan_buffer_line(float x, float y, float z, float feed_rate, uint8_t invert
   block->recalculate_flag = true; // Always calculate trapezoid for new block
 
   // Update previous path unit_vector and nominal speed
-  memcpy(pl.previous_unit_vec, unit_vec, sizeof(unit_vec)); // pl.previous_unit_vec[] = unit_vec[]
+  ///memcpy(pl.previous_unit_vec, unit_vec, sizeof(unit_vec)); // pl.previous_unit_vec[] = unit_vec[]
+  char k;
+  for ( k = 0; k < 3; k++ ) pl.previous_unit_vec[ k ] = unit_vec[ k ];
   pl.previous_nominal_speed = block->nominal_speed;
 
   // Update buffer head and next buffer head indices
@@ -471,7 +474,8 @@ void plan_buffer_line(float x, float y, float z, float feed_rate, uint8_t invert
   next_buffer_head = next_block_index(block_buffer_head);
 
   // Update planner position
-  memcpy(pl.position, target, sizeof(target)); // pl.position[] = target[]
+  ///memcpy(pl.position, target, sizeof(target)); // pl.position[] = target[]
+  for ( k = 0; k < 3; k++ ) pl.position[ k ] = target[ k ];
 
   planner_recalculate();
 }

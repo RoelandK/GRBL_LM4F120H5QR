@@ -224,7 +224,8 @@ uint8_t protocol_execute_line(char *line)
 
     uint8_t char_counter = 1;
     uint8_t helper_var = 0; // Helper variable
-    float parameter, value;
+    float parameter = 0.0;
+    float value = 0.0;
     switch( line[char_counter] ) {
       case 0 : report_grbl_help(); break;
       case '$' : // Prints Grbl settings

@@ -30,7 +30,7 @@
 #define DEFAULTS_GENERIC
 
 // Serial baud rate
-#define BAUD_RATE 9600
+#define BAUD_RATE 9600 /// hardcoded 115200 for LM4F120H5QR devboard
 
 // Define pin-assignments
 // NOTE: All step bit and direction pins must be on the same port.

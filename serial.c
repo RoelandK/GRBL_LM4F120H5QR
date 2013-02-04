@@ -41,13 +41,13 @@
 #include "motion_control.h"
 #include "protocol.h"
 
-volatile uint8_t rx_buffer[RX_BUFFER_SIZE];
-volatile uint8_t rx_buffer_head = 0;
-volatile uint8_t rx_buffer_tail = 0;
+uint8_t rx_buffer[RX_BUFFER_SIZE];
+volatile uint8_t rx_buffer_head;
+volatile uint8_t rx_buffer_tail;
 
-volatile uint8_t tx_buffer[TX_BUFFER_SIZE];
-volatile uint8_t tx_buffer_head = 0;
-volatile uint8_t tx_buffer_tail = 0;
+uint8_t tx_buffer[TX_BUFFER_SIZE];
+volatile uint8_t tx_buffer_head;
+volatile uint8_t tx_buffer_tail;
 
 #ifdef ENABLE_XONXOFF
   volatile uint8_t flow_ctrl = XON_SENT; // Flow control state variable
@@ -80,24 +80,18 @@ void arm_uart_interrupt_handler( void ) {
   unsigned long ul = UARTIntStatus( UART0_BASE, true );
   UARTIntClear( UART0_BASE, ul );
 
-  //Interrupted because the TX FIFO has space available?
-  if ( ul & UART_INT_TX ) {
-    UARTIntDisable( UART0_BASE, UART_INT_TX ); //disable uart interrupt during FIFO filling
+  //receive chars if any
+  while ( UARTCharsAvail( UART0_BASE) ) arm_uart_receive_data();
 
-    if ( transmit_buffer_empty() ) {
-      //If the output buffer is empty, just turn off the transmit interrupt
-      return;
-    } else {
-      //else fill FIFO with new data
-      while ( UARTSpaceAvail( UART0_BASE ) && !transmit_buffer_empty() ) arm_uart_send_data();
-      UARTIntEnable( UART0_BASE, UART_INT_TX );
-      return;
-    }
+  //transmit characters if possible
+  while ( UARTSpaceAvail( UART0_BASE ) && !transmit_buffer_empty() ) arm_uart_send_data();
+
+  //if nothing to transmit, then switch off transmit interrupt, otherwise enable TX interrupt
+  if ( !UARTBusy( UART0_BASE ) && transmit_buffer_empty() ) {
+    UARTIntDisable( UART0_BASE, UART_INT_TX );
+  } else {
+    UARTIntEnable( UART0_BASE, UART_INT_TX );
   }
-
-  //Interrupted because received a character?
-  if ( ul & ( UART_INT_RX | UART_INT_RT ) )
-    while ( UARTCharsAvail( UART0_BASE) ) arm_uart_receive_data();
 }
 #endif
 
@@ -105,6 +99,9 @@ void serial_init()
 {
 #ifdef PART_LM4F120H5QR
   //code for ARM
+  rx_buffer_head = rx_buffer_tail = 0;
+  tx_buffer_head = tx_buffer_tail = 0;
+
   SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA ); //enable pins which correspond to RxD and TxD signals
   SysCtlDelay( 26 ); // Delay 1usec for peripherial to start
   GPIOPinConfigure( GPIO_PA0_U0RX ); //configure pin to be RxD of UART0
@@ -164,8 +161,9 @@ void serial_write(uint8_t data) {
 
 #ifdef PART_LM4F120H5QR
   // ARM code
-  arm_uart_send_data(); //actually send data
-  UARTIntEnable( UART0_BASE, UART_INT_TX );
+  arm_uart_interrupt_handler();
+//  arm_uart_send_data(); //actually send data
+//  UARTIntEnable( UART0_BASE, UART_INT_TX );
 #else
   // AVR code
   // Enable Data Register Empty Interrupt to make sure tx-streaming is running

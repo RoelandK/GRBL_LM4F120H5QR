@@ -113,9 +113,9 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
   // and speedy homing routine.
   // NOTE: For each axes enabled, the following calculations assume they physically move
   // an equal distance over each time step until they hit a limit switch, aka dogleg.
-  uint32_t steps[3];
+  uint32_t steps[3] = { 0, 0, 0 };
   uint8_t dist = 0;
-  clear_vector(steps);
+///  clear_vector(steps);
   if (cycle_mask & (1<<X_AXIS)) {
     dist++;
     steps[X_AXIS] = lround(settings.steps_per_mm[X_AXIS]);
@@ -154,7 +154,7 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
   if (dt > dt_min) { dt = dt_min; } // Disable acceleration for very slow rates.
 
   // Set default out_bits.
-  uint8_t out_bits0 = settings.invert_mask;
+  uint32_t out_bits0 = settings.invert_mask;
   out_bits0 ^= (settings.homing_dir_mask & DIRECTION_MASK); // Apply homing direction settings
   if (!pos_dir) { out_bits0 ^= DIRECTION_MASK; }   // Invert bits, if negative dir.
 
@@ -165,8 +165,8 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
   uint32_t step_delay = dt-settings.pulse_microseconds;  // Step delay after pulse
   uint32_t step_rate = 0;  // Tracks step rate. Initialized from 0 rate. (in step/min)
   uint32_t trap_counter = MICROSECONDS_PER_ACCELERATION_TICK/2; // Acceleration trapezoid counter
-  uint8_t out_bits;
-  uint8_t limit_state;
+  uint32_t out_bits;
+  uint32_t limit_state;
   for(;;) {
 
     // Reset out bits. Both direction and step pins appropriately inverted and set.

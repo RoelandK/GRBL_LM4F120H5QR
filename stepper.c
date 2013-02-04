@@ -65,7 +65,7 @@ static block_t *current_block;  // A pointer to the block currently being traced
 // Used by the stepper driver interrupt
 ///static uint8_t step_pulse_time; // Step pulse reset time after step rise
 static uint32_t step_pulse_time; // Step pulse reset time after step rise
-static uint8_t out_bits;        // The next stepping-bits to be output
+static uint32_t out_bits;        // The next stepping-bits to be output
 static volatile uint8_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
 
 #if STEP_PULSE_DELAY > 0

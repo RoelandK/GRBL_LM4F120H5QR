@@ -297,7 +297,9 @@ void report_realtime_status()
   // for a user to select the desired real-time data.
   uint8_t i;
   int32_t current_position[3]; // Copy current state of the system position variable
-  memcpy(current_position,sys.position,sizeof(sys.position));
+  ///memcpy(current_position,sys.position,sizeof(sys.position));
+  char k;
+  for ( k = 0; k < 3; k++ ) current_position[ k ] = sys.position[ k ];
   float print_position[3];
 
   // Report current machine state

@@ -49,11 +49,11 @@
 // Declare system global variable structure
 system_t sys;
 
-int main(void)
+void main(void)
 {
 	SysCtlClockSet( SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN ); //set system clock to 80 MHz
 	FPUEnable(); //enable the Floating Point Unit
-	FPUStackingEnable(); // Enable stacking for interrupt handlers
+//	FPULazyStackingEnable(); // Enable stacking for interrupt handlers
 
   // Initialize system
   serial_init(); // Enable and Initialize the UART.

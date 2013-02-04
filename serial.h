@@ -28,7 +28,7 @@
 #include "nuts_bolts.h"
 
 #ifndef RX_BUFFER_SIZE
-  #define RX_BUFFER_SIZE 128
+  #define RX_BUFFER_SIZE 32
 #endif
 #ifndef TX_BUFFER_SIZE
   #define TX_BUFFER_SIZE 128
