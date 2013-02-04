@@ -20,15 +20,16 @@
 */
 
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
-   used to be a part of the Arduino project. */
+   used to be a part of the Arduino project. */ 
+
 #ifdef PART_LM4F120H5QR
   #include "inc/hw_types.h"
 #else
   #include <avr/pgmspace.h>
 #endif
 
-#include "serial.h"
 #include "config.h"
+#include "serial.h"
 #include "settings.h"
 
 void printString(const char *s)
@@ -37,8 +38,7 @@ void printString(const char *s)
     serial_write(*s++);
 }
 
-#ifndef PART_LM4F120H5QR
-// AVR code
+#ifndef PART_LM4F120H5QR // AVR code
 // Print a string stored in PGM-memory
 void _printPgmString(const char *s)
 {
@@ -49,20 +49,20 @@ void _printPgmString(const char *s)
 #endif
 
 // void printIntegerInBase(unsigned long n, unsigned long base)
-// {
-// 	unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars.
+// { 
+// 	unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars. 
 // 	unsigned long i = 0;
-//
+// 
 // 	if (n == 0) {
 // 		serial_write('0');
 // 		return;
-// 	}
-//
+// 	} 
+// 
 // 	while (n > 0) {
 // 		buf[i++] = n % base;
 // 		n /= base;
 // 	}
-//
+// 
 // 	for (; i > 0; i--)
 // 		serial_write(buf[i - 1] < 10 ?
 // 			'0' + buf[i - 1] :
@@ -70,12 +70,12 @@ void _printPgmString(const char *s)
 // }
 
 void print_uint8_base2(uint8_t n)
-{
-	char buf[8];
+{ 
+	unsigned char buf[8];
 	uint8_t i = 0;
 
 	for (; i < 8; i++) {
-    buf[i] = n & 1;
+		buf[i] = n & 1;
 		n >>= 1;
 	}
 
@@ -84,8 +84,8 @@ void print_uint8_base2(uint8_t n)
 }
 
 static void print_uint32_base10(unsigned long n)
-{
-  unsigned char buf[10];
+{ 
+  unsigned char buf[10]; 
   uint8_t i = 0;
 
   if (n == 0) {
@@ -114,7 +114,7 @@ void printInteger(long n)
 // Convert float to string by immediately converting to a long integer, which contains
 // more digits than a float. Number of decimal places, which are tracked by a counter,
 // may be set by the user. The integer is then efficiently converted to a string.
-// NOTE: AVR '%' and '/' integer operations are very efficient. Bitshifting speed-up
+// NOTE: AVR '%' and '/' integer operations are very efficient. Bitshifting speed-up 
 // techniques are actually just slightly slower. Found this out the hard way.
 void printFloat(float n)
 {
@@ -154,5 +154,5 @@ void printFloat(float n)
 
   // Print the generated string.
   for (; i > 0; i--)
-    serial_write(buf[i]);
+    serial_write(buf[i-1]);
 }

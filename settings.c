@@ -1,9 +1,9 @@
 /*
-  settings.c - eeprom configuration handling
+  settings.c - eeprom configuration handling 
   Part of Grbl
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
-  Copyright (c) 2011-2012 Sungeun K. Jeon
+  Copyright (c) 2011-2012 Sungeun K. Jeon  
 
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,10 +19,14 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/eeprom.h"
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/eeprom.h"
+#else // code for AVR
+  #include <avr/io.h>
+#endif
 
 #include "protocol.h"
 #include "report.h"
@@ -32,39 +36,50 @@
 #include "limits.h"
 
 settings_t settings;
-void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size );
-int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size );
+
+#ifdef PART_LM4F120H5QR // code for ARM
+  void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size );
+  int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size );
+#endif
 
 // Method to store startup lines into EEPROM
 void settings_store_startup_line(uint8_t n, char *line)
 {
-  ///uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  unsigned long addr = n * ( LINE_BUFFER_SIZE + 4 ) + EEPROM_ADDR_STARTUP_BLOCK; /// +4 to add CRC uint32
-
-  ///memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
-  EEPROMsave( addr, (unsigned long *) line, LINE_BUFFER_SIZE );
+	#ifdef PART_LM4F120H5QR // code for ARM
+  	unsigned long addr = n * ( LINE_BUFFER_SIZE + 4 ) + EEPROM_ADDR_STARTUP_BLOCK; /// +4 to add CRC uint32
+  	EEPROMsave( addr, (unsigned long *) line, LINE_BUFFER_SIZE );
+	#else // code for AVR
+    uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
+    memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  #endif
 }
 
 // Method to store coord data parameters into EEPROM
 void settings_write_coord_data(uint8_t coord_select, float *coord_data)
 {
-  ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
-  ///memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
-  EEPROMsave( addr, (unsigned long *) coord_data, sizeof( float ) * N_AXIS );
+  #ifdef PART_LM4F120H5QR // code for ARM
+    unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
+    EEPROMsave( addr, (unsigned long *) coord_data, sizeof( float ) * N_AXIS );
+  #else // code for AVR
+    uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+    memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
+  #endif
 }
 
 // Method to store Grbl global settings struct and version number into EEPROM
 void write_global_settings()
 {
-  ///eeprom_put_char(0, SETTINGS_VERSION);
-  ///memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
-  unsigned long v = SETTINGS_VERSION;
-  EEPROMsave( 0, &v, 4 );
-  EEPROMsave( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) );
+	#ifdef PART_LM4F120H5QR // code for ARM
+	  unsigned long v = SETTINGS_VERSION;
+    EEPROMsave( 0, &v, 4 );
+    EEPROMsave( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) );
+	#else // code for AVR
+    eeprom_put_char(0, SETTINGS_VERSION);
+    memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
+  #endif
 }
 
-// Method to reset Grbl global settings back to defaults.
+// Method to reset Grbl global settings back to defaults. 
 void settings_reset(bool reset_all) {
   // Reset all settings or only the migration settings to the new version.
   if (reset_all) {
@@ -100,9 +115,13 @@ void settings_reset(bool reset_all) {
 // Reads startup line from EEPROM. Updated pointed line string data.
 uint8_t settings_read_startup_line(uint8_t n, char *line)
 {
+#ifdef PART_LM4F120H5QR // code for ARM
   unsigned long addr = n * ( LINE_BUFFER_SIZE + 4 ) + EEPROM_ADDR_STARTUP_BLOCK;
-  ///if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
   if ( !EEPROMload( addr, (unsigned long *) line, LINE_BUFFER_SIZE) ) {
+#else // code for AVR
+  uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
+  if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
+#endif
     // Reset line with default value
     line[0] = 0;
     settings_store_startup_line(n, line);
@@ -115,12 +134,13 @@ uint8_t settings_read_startup_line(uint8_t n, char *line)
 // Read selected coordinate data from EEPROM. Updates pointed coord_data value.
 uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 {
-  ///return false;
-
-  ///uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+#ifdef PART_LM4F120H5QR // code for ARM
   unsigned long addr = coord_select * ( sizeof( float ) * N_AXIS + 4 ) + EEPROM_ADDR_PARAMETERS; /// +4 to add CRC uint32
-  ///if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
   if ( !EEPROMload( addr, (unsigned long *) coord_data, sizeof( float ) * N_AXIS ) ) {
+#else // code for AVR
+  uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
+#endif
     // Reset with default zero vector
     clear_vector_float(coord_data);
     settings_write_coord_data(coord_select,coord_data);
@@ -133,36 +153,30 @@ uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 // Reads Grbl global settings struct from EEPROM.
 uint8_t read_global_settings() {
   // Check version-byte of eeprom
-  ///uint8_t version = eeprom_get_char(0);
-  unsigned long version = 0;
-  EEPROMload( 0, &version, 4 );
+  #ifdef PART_LM4F120H5QR // code for ARM
+    unsigned long version = 0;
+    EEPROMload( 0, &version, 4 );
+  #else // code for AVR
+    uint8_t version = eeprom_get_char(0);
+  #endif
 
   if (version == SETTINGS_VERSION) {
     // Read settings-record and check checksum
-    ///if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) return(false);
-    if ( !EEPROMload( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) ) ) return false;
-//    EEPROMRead( (unsigned long *) &settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t) );
-  } else
-      return false;
-    /*else {
-    if (version <= 4) {
-      // Migrate from settings version 4 to current version.
-      if (!(memcpy_from_eeprom_with_checksum((char*)&settings, 1, sizeof(settings_v4_t)))) {
-        return(false);
-      }
-      settings_reset(false); // Old settings ok. Write new settings only.
-    } else {
-      return(false);
-    }
-  }*/
-  return(true);
+    #ifdef PART_LM4F120H5QR // code for ARM
+      if ( !EEPROMload( EEPROM_ADDR_GLOBAL, (unsigned long *) &settings, sizeof( settings_t ) ) ) return false;
+    #else // code for AVR
+      if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) return false;
+    #endif
+  } else return false;
+
+  return true;
 }
 
 // A helper method to set settings from command line
 uint8_t settings_store_global_setting(int parameter, float value) {
   switch(parameter) {
     case 0: case 1: case 2:
-      if (value <= 0.0) { return(STATUS_SETTING_VALUE_NEG); }
+      if (value <= 0.0) { return(STATUS_SETTING_VALUE_NEG); } 
       settings.steps_per_mm[parameter] = value; break;
     case 3:
       if (value < 3) { return(STATUS_SETTING_STEP_PULSE_MIN); }
@@ -211,9 +225,11 @@ uint8_t settings_store_global_setting(int parameter, float value) {
 
 // Initialize the config subsystem
 void settings_init() {
-  SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
-  SysCtlDelay( 26 ); ///delay 1us gives the module some time to start
-  EEPROMInit();
+  #ifdef PART_LM4F120H5QR // code for ARM
+    SysCtlPeripheralEnable( SYSCTL_PERIPH_EEPROM0 );
+    SysCtlDelay( 26 ); ///delay 1us gives the module some time to start
+    EEPROMInit();
+  #endif
 
   if(!read_global_settings()) {
     report_status_message(STATUS_SETTING_READ_FAIL);
@@ -232,6 +248,7 @@ void settings_init() {
   // NOTE: Startup lines are handled and called by main.c at the end of initialization.
 }
 
+#ifdef PART_LM4F120H5QR // code for ARM: eeprom read/write
 /// Save settings to eeprom with crc
 void EEPROMsave( unsigned long addr, unsigned long * data, unsigned long size ) {
   EEPROMProgram( data, addr, size );
@@ -264,3 +281,4 @@ int EEPROMload( unsigned long addr, unsigned long * data, unsigned long size ) {
 
   return checksum == checksum2;
 }
+#endif

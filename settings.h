@@ -42,7 +42,7 @@
 // NOTE: The Atmega328p has 1KB EEPROM. The upper half is reserved for parameters and
 // the startup script. The lower half contains the global settings and space for future
 // developments.
-#define EEPROM_ADDR_GLOBAL 8 //8 bytes are for version number + CRC uint32
+#define EEPROM_ADDR_GLOBAL 8 //ARM: 8 bytes are for version number + CRC uint32
 #define EEPROM_ADDR_PARAMETERS 512
 #define EEPROM_ADDR_STARTUP_BLOCK 768
 

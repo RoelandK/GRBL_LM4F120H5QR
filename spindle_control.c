@@ -19,10 +19,12 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
+#endif
 
 #include "settings.h"
 #include "spindle_control.h"

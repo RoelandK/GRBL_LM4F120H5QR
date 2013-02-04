@@ -3,7 +3,7 @@
   Part of Grbl
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
-  Copyright (c) 2011-2012 Sungeun K. Jeon
+  Copyright (c) 2011-2012 Sungeun K. Jeon  
 
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -19,16 +19,14 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef PART_LM4F120H5QR
-  // ARM includes
+#ifdef PART_LM4F120H5QR // code for ARM
   #include "inc/hw_types.h"
   #include "inc/hw_memmap.h"
   #include "driverlib/sysctl.h"
   #include "driverlib/gpio.h"
 
   void pinout_interrupt( void ); //declaration
-#else
-  // AVR includes
+#else // code for AVR
   #include <avr/io.h>
   #include <avr/interrupt.h>
 #endif
@@ -45,17 +43,17 @@
 #include "motion_control.h"
 
 static char line[LINE_BUFFER_SIZE]; // Line to be executed. Zero-terminated.
-static uint32_t char_counter; // Last character counter in line variable.
-static uint32_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
+static uint8_t char_counter; // Last character counter in line variable.
+static uint8_t iscomment; // Comment/block delete flag for processor to ignore comment characters.
 
-void protocol_init()
+
+void protocol_init() 
 {
   char_counter = 0; // Reset line input
   iscomment = false;
   report_init_message(); // Welcome message
 
-#ifdef PART_LM4F120H5QR
-  // ARM code
+#ifdef PART_LM4F120H5QR // code for ARM
   SysCtlPeripheralEnable( PINOUT_PERIPH ); ///Enable the GPIO module for PINOUT port
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
 
@@ -64,8 +62,7 @@ void protocol_init()
   GPIOPortIntRegister( PINOUT_PORT, pinout_interrupt ); //register a call-back funcion for interrupt
   GPIOIntTypeSet( PINOUT_PORT, PINOUT_MASK, GPIO_BOTH_EDGES ); // Enable specific pins of the Pin Change Interrupt
   GPIOPinIntEnable( PINOUT_PORT, PINOUT_MASK ); // Enable Pin Change Interrupt
-#else
-  // AVR code
+#else // code for AVR
   PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
   PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
   PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
@@ -74,7 +71,7 @@ void protocol_init()
 }
 
 // Executes user startup script, if stored.
-void protocol_execute_startup()
+void protocol_execute_startup() 
 {
   uint8_t n;
   for (n=0; n < N_STARTUP_LINE; n++) {
@@ -85,12 +82,12 @@ void protocol_execute_startup()
         printString(line); // Echo startup line to indicate execution.
         report_status_message(gc_execute_line(line));
       }
-    }
-  }
+    } 
+  }  
 }
 
 // Pin change interrupt for pin-out commands, i.e. cycle start, feed hold, and reset. Sets
-// only the runtime command execute variable to have the main program execute these when
+// only the runtime command execute variable to have the main program execute these when 
 // its ready. This works exactly like the character-based runtime commands when picked off
 // directly from the incoming serial data stream.
 #ifdef PART_LM4F120H5QR
@@ -115,11 +112,11 @@ void pinout_interrupt( void ) {
 ISR(PINOUT_INT_vect)
 {
   // Enter only if any pinout pin is actively low.
-  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) {
+  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) { 
     if (bit_isfalse(PINOUT_PIN,bit(PIN_RESET))) {
       mc_reset();
     } else if (bit_isfalse(PINOUT_PIN,bit(PIN_FEED_HOLD))) {
-      sys.execute |= EXEC_FEED_HOLD;
+      sys.execute |= EXEC_FEED_HOLD; 
     } else if (bit_isfalse(PINOUT_PIN,bit(PIN_CYCLE_START))) {
       sys.execute |= EXEC_CYCLE_START;
     }
@@ -131,9 +128,9 @@ ISR(PINOUT_INT_vect)
 // program, primarily where there may be a while loop waiting for a buffer to clear space or any
 // point where the execution time from the last check point may be more than a fraction of a second.
 // This is a way to execute runtime commands asynchronously (aka multitasking) with grbl's g-code
-// parsing and planning functions. This function also serves as an interface for the interrupts to
+// parsing and planning functions. This function also serves as an interface for the interrupts to 
 // set the system runtime flags, where only the main program handles them, removing the need to
-// define more computationally-expensive volatile variables. This also provides a controlled way to
+// define more computationally-expensive volatile variables. This also provides a controlled way to 
 // execute certain tasks without having two or more instances of the same task, such as the planner
 // recalculating the buffer upon a feedhold or override.
 // NOTE: The sys.execute variable flags are set by any process, step or serial interrupts, pinouts,
@@ -142,19 +139,19 @@ void protocol_execute_runtime()
 {
   if (sys.execute) { // Enter only if any bit flag is true
     uint8_t rt_exec = sys.execute; // Avoid calling volatile multiple times
-
+    
     // System alarm. Everything has shutdown by something that has gone severely wrong. Report
     // the source of the error to the user. If critical, Grbl disables by entering an infinite
     // loop until system reset/abort.
-    if (rt_exec & (EXEC_ALARM | EXEC_CRIT_EVENT)) {
+    if (rt_exec & (EXEC_ALARM | EXEC_CRIT_EVENT)) {      
       sys.state = STATE_ALARM; // Set system alarm state
 
       // Critical event. Only hard limit qualifies. Update this as new critical events surface.
       if (rt_exec & EXEC_CRIT_EVENT) {
-        report_alarm_message(ALARM_HARD_LIMIT);
+        report_alarm_message(ALARM_HARD_LIMIT); 
         report_feedback_message(MESSAGE_CRITICAL_EVENT);
         bit_false(sys.execute,EXEC_RESET); // Disable any existing reset
-        do {
+        do { 
           // Nothing. Block EVERYTHING until user issues reset or power cycles. Hard limits
           // typically occur while unattended or not paying attention. Gives the user time
           // to do what is needed before resetting, like killing the incoming stream.
@@ -168,9 +165,9 @@ void protocol_execute_runtime()
         report_alarm_message(ALARM_ABORT_CYCLE);
       }
       bit_false(sys.execute,(EXEC_ALARM | EXEC_CRIT_EVENT));
-    }
-
-    // Execute system abort.
+    } 
+  
+    // Execute system abort. 
     if (rt_exec & EXEC_RESET) {
       sys.abort = true;  // Only place this is set true.
       return; // Nothing else to do but exit.

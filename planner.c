@@ -4,8 +4,8 @@
 
   Copyright (c) 2009-2011 Simen Svale Skogsrud
   Copyright (c) 2011-2012 Sungeun K. Jeon
-  Copyright (c) 2011 Jens Geisler
-
+  Copyright (c) 2011 Jens Geisler  
+  
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -49,7 +49,7 @@ static planner_t pl;
 
 // Returns the index of the next block in the ring buffer
 // NOTE: Removed modulo (%) operator, which uses an expensive divide and multiplication.
-static uint8_t next_block_index(uint8_t block_index)
+static uint8_t next_block_index(uint8_t block_index) 
 {
   block_index++;
   if (block_index == BLOCK_BUFFER_SIZE) { block_index = 0; }
@@ -58,7 +58,7 @@ static uint8_t next_block_index(uint8_t block_index)
 
 
 // Returns the index of the previous block in the ring buffer
-static uint8_t prev_block_index(uint8_t block_index)
+static uint8_t prev_block_index(uint8_t block_index) 
 {
   if (block_index == 0) { block_index = BLOCK_BUFFER_SIZE; }
   block_index--;

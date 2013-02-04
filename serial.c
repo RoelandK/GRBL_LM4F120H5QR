@@ -21,8 +21,8 @@
 
 /* This code was initially inspired by the wiring_serial module by David A. Mellis which
    used to be a part of the Arduino project. */
-#if defined( PART_LM4F120H5QR )
-  // ARM includes
+
+#if defined( PART_LM4F120H5QR ) // code for ARM
   #include "inc/hw_memmap.h"
   #include "inc/hw_types.h"
   #include "driverlib/sysctl.h"
@@ -31,8 +31,7 @@
   #include "driverlib/pin_map.h"
   #include "driverlib/gpio.h"
   #include "inc/hw_ints.h"
-#else
-  // AVR includes
+#else // code for AVR
   #include <avr/interrupt.h>
 #endif
 
@@ -51,15 +50,15 @@ volatile uint8_t tx_buffer_tail;
 
 #ifdef ENABLE_XONXOFF
   volatile uint8_t flow_ctrl = XON_SENT; // Flow control state variable
-
-// Returns the number of bytes in the RX buffer. This replaces a typical byte counter to prevent
-// the interrupt and main programs from writing to the counter at the same time.
-static uint8_t get_rx_buffer_count()
-{
-  if (rx_buffer_head == rx_buffer_tail) { return(0); }
-  if (rx_buffer_head < rx_buffer_tail) { return(rx_buffer_tail-rx_buffer_head); }
-  return (RX_BUFFER_SIZE - (rx_buffer_head-rx_buffer_tail));
-}
+  
+  // Returns the number of bytes in the RX buffer. This replaces a typical byte counter to prevent
+  // the interrupt and main programs from writing to the counter at the same time.
+  static uint8_t get_rx_buffer_count()
+  {
+    if (rx_buffer_head == rx_buffer_tail) { return(0); }
+    if (rx_buffer_head < rx_buffer_tail) { return(rx_buffer_tail-rx_buffer_head); }
+    return (RX_BUFFER_SIZE - (rx_buffer_head-rx_buffer_tail));
+  }
 #endif
 
 inline uint8_t receive_buffer_empty() {
@@ -159,13 +158,9 @@ void serial_write(uint8_t data) {
   tx_buffer[tx_buffer_head] = data;
   tx_buffer_head = next_head;
 
-#ifdef PART_LM4F120H5QR
-  // ARM code
+#ifdef PART_LM4F120H5QR // code for ARM
   arm_uart_interrupt_handler();
-//  arm_uart_send_data(); //actually send data
-//  UARTIntEnable( UART0_BASE, UART_INT_TX );
-#else
-  // AVR code
+#else // code for AVR
   // Enable Data Register Empty Interrupt to make sure tx-streaming is running
   UCSR0B |=  (1 << UDRIE0);
 #endif
@@ -173,11 +168,11 @@ void serial_write(uint8_t data) {
 
 // Data Register Empty Interrupt handler
 #if defined( PART_LM4F120H5QR )
-void arm_uart_send_data( void )
+  void arm_uart_send_data( void )
 #elif defined( __AVR_ATmega644P__ )
-ISR(USART0_UDRE_vect)
+  ISR(USART0_UDRE_vect)
 #else
-ISR(USART_UDRE_vect)
+  ISR(USART_UDRE_vect)
 #endif
 {
   if ( transmit_buffer_empty() ) {
@@ -251,12 +246,10 @@ ISR(USART_RX_vect)
 #endif
 {
 
-#if defined( PART_LM4F120H5QR )
-  // ARM code
+#if defined( PART_LM4F120H5QR ) // code for ARM
   uint8_t data = (uint8_t)( UARTCharGetNonBlocking( UART0_BASE ) & 0xFF ); //read a char and remove control bits (highest)
   serial_write( data ); //echo
-#else
-  // AVR code
+#else // code for AVR
   uint8_t data = UDR0;
 #endif
 

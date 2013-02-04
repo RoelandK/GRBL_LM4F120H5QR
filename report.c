@@ -2,7 +2,7 @@
   report.c - reporting and messaging methods
   Part of Grbl
 
-  Copyright (c) 2012 Sungeun K. Jeon
+  Copyright (c) 2012 Sungeun K. Jeon  
 
   Grbl is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,11 +18,11 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/*
-  This file functions as the primary feedback interface for Grbl. Any outgoing data, such
+/* 
+  This file functions as the primary feedback interface for Grbl. Any outgoing data, such 
   as the protocol status messages, feedback messages, and status reports, are stored here.
-  For the most part, these functions primarily are called from protocol.c methods. If a
-  different style feedback is desired (i.e. JSON), then a user can change these following
+  For the most part, these functions primarily are called from protocol.c methods. If a 
+  different style feedback is desired (i.e. JSON), then a user can change these following 
   methods to accomodate their needs.
 */
 
@@ -42,14 +42,14 @@
 
 
 // Handles the primary confirmation protocol response for streaming interfaces and human-feedback.
-// For every incoming line, this method responds with an 'ok' for a successful command or an
-// 'error:'  to indicate some error event with the line or some critical system error during
+// For every incoming line, this method responds with an 'ok' for a successful command or an 
+// 'error:'  to indicate some error event with the line or some critical system error during 
 // operation. Errors events can originate from the g-code parser, settings module, or asynchronously
 // from a critical error, such as a triggered hard limit. Interface should always monitor for these
 // responses.
 // NOTE: In silent mode, all error codes are greater than zero.
 // TODO: Install silent mode to return only numeric values, primarily for GUIs.
-void report_status_message(uint8_t status_code)
+void report_status_message(uint8_t status_code) 
 {
   if (status_code == 0) { // STATUS_OK
     printPgmString("ok\r\n");
@@ -184,9 +184,9 @@ void report_gcode_parameters()
 {
   float coord_data[N_AXIS];
   uint8_t coord_select, i;
-  for (coord_select = 0; coord_select <= SETTING_INDEX_NCOORD; coord_select++) {
-    if (!(settings_read_coord_data(coord_select,coord_data))) {
-      report_status_message(STATUS_SETTING_READ_FAIL);
+  for (coord_select = 0; coord_select <= SETTING_INDEX_NCOORD; coord_select++) { 
+    if (!(settings_read_coord_data(coord_select,coord_data))) { 
+      report_status_message(STATUS_SETTING_READ_FAIL); 
       return;
     }
     printPgmString("[G");
@@ -231,7 +231,7 @@ void report_gcode_modes()
 
   printPgmString(" G");
   printInteger(gc.coord_select+54);
-
+  
   if (gc.plane_axis_0 == X_AXIS) {
     if (gc.plane_axis_1 == Y_AXIS) { printPgmString(" G17"); }
     else { printPgmString(" G18"); }
@@ -257,7 +257,7 @@ void report_gcode_modes()
     case -1 : printPgmString(" M4"); break;
     case 0 : printPgmString(" M5"); break;
   }
-
+  
   switch (gc.coolant_mode) {
     case COOLANT_DISABLE : printPgmString(" M9"); break;
     case COOLANT_FLOOD_ENABLE : printPgmString(" M8"); break;
@@ -284,24 +284,22 @@ void report_startup_line(uint8_t n, char *line)
   printPgmString("\r\n");
 }
 
- // Prints real-time data. This function grabs a real-time snapshot of the stepper subprogram
+ // Prints real-time data. This function grabs a real-time snapshot of the stepper subprogram 
  // and the actual location of the CNC machine. Users may change the following function to their
  // specific needs, but the desired real-time data report must be as short as possible. This is
- // requires as it minimizes the computational overhead and allows grbl to keep running smoothly,
+ // requires as it minimizes the computational overhead and allows grbl to keep running smoothly, 
  // especially during g-code programs with fast, short line segments and high frequency reports (5-20Hz).
 void report_realtime_status()
 {
-  // **Under construction** Bare-bones status report. Provides real-time machine position relative to
+  // **Under construction** Bare-bones status report. Provides real-time machine position relative to 
   // the system power on location (0,0,0) and work coordinate position (G54 and G92 applied). Eventually
   // to be added are distance to go on block, processed block id, and feed rate. Also a settings bitmask
   // for a user to select the desired real-time data.
   uint8_t i;
-  int32_t current_position[3]; // Copy current state of the system position variable
-  ///memcpy(current_position,sys.position,sizeof(sys.position));
-  char k;
-  for ( k = 0; k < 3; k++ ) current_position[ k ] = sys.position[ k ];
-  float print_position[3];
-
+  int32_t current_position[N_AXIS]; // Copy current state of the system position variable
+  memcpy(current_position,sys.position,sizeof(sys.position));
+  float print_position[N_AXIS];
+ 
   // Report current machine state
   switch (sys.state) {
     case STATE_IDLE: printPgmString("<Idle"); break;
@@ -313,7 +311,7 @@ void report_realtime_status()
     case STATE_ALARM: printPgmString("<Alarm"); break;
     case STATE_CHECK_MODE: printPgmString("<Check"); break;
   }
-
+ 
   // Report machine position
   printPgmString(",MPos:");
   for (i=0; i<= 2; i++) {
@@ -322,7 +320,7 @@ void report_realtime_status()
     printFloat(print_position[i]);
     printPgmString(",");
   }
-
+  
   // Report work position
   printPgmString("WPos:");
   for (i=0; i<= 2; i++) {

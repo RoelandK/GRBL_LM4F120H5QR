@@ -19,8 +19,12 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "inc/hw_types.h"
-#include "driverlib/sysctl.h"
+#ifdef PART_LM4F120H5QR // code for ARM
+  #include "inc/hw_types.h"
+  #include "driverlib/sysctl.h"
+#else // code for AVR
+  #include <util/delay.h>
+#endif
 
 #include "nuts_bolts.h"
 #include "gcode.h"
@@ -34,13 +38,13 @@
 // available conversion method examples, but has been highly optimized for Grbl. For known
 // CNC applications, the typical decimal value is expected to be in the range of E0 to E-4.
 // Scientific notation is officially not supported by g-code, and the 'E' character may
-// be a g-code word on some CNC systems. So, 'E' notation will not be recognized.
+// be a g-code word on some CNC systems. So, 'E' notation will not be recognized. 
 // NOTE: Thanks to Radu-Eosif Mihailescu for identifying the issues with using strtod().
-int read_float(char *line, uint8_t *char_counter, float *float_ptr)
+int read_float(char *line, uint8_t *char_counter, float *float_ptr)                  
 {
   char *ptr = line + *char_counter;
   unsigned char c;
-
+    
   // Grab first character and increment pointer. No spaces assumed in line.
   c = *ptr++;
 
@@ -88,11 +92,11 @@ int read_float(char *line, uint8_t *char_counter, float *float_ptr)
   // expected range of E0 to E-4.
   if (fval != 0) {
     while (exp <= -2) {
-      fval *= 0.01;
+      fval *= 0.01; 
       exp += 2;
     }
-    if (exp < 0) {
-      fval *= 0.1;
+    if (exp < 0) { 
+      fval *= 0.1; 
     } else if (exp > 0) {
       do {
         fval *= 10.0;
@@ -100,7 +104,7 @@ int read_float(char *line, uint8_t *char_counter, float *float_ptr)
     }
   }
 
-  // Assign floating point value with correct sign.
+  // Assign floating point value with correct sign.    
   if (isnegative) {
     *float_ptr = -fval;
   } else {
@@ -127,24 +131,25 @@ void delay_ms(uint16_t ms)
 // efficiently with larger delays, as the counter adds parasitic time in each iteration.
 void delay_us(uint32_t us)
 {
-  SysCtlDelay( F_CPU / 3000000 * us );
-/*
-  while (us) {
-    if (us < 10) {
-      _delay_us(1);
-      us--;
-    } else if (us < 100) {
-      _delay_us(10);
-      us -= 10;
-    } else if (us < 1000) {
-      _delay_us(100);
-      us -= 100;
-    } else {
-      _delay_ms(1);
-      us -= 1000;
+	#ifdef PART_LM4F120H5QR
+	  SysCtlDelay( F_CPU / 3000000 * us );
+	#else // code for AVR
+    while (us) {
+      if (us < 10) { 
+        _delay_us(1);
+        us--;
+      } else if (us < 100) {
+        _delay_us(10);
+        us -= 10;
+      } else if (us < 1000) {
+        _delay_us(100);
+        us -= 100;
+      } else {
+        _delay_ms(1);
+        us -= 1000;
+      }
     }
-  }
-*/
+  #endif
 }
 
 // Syncs all internal position vectors to the current system position.
