@@ -97,11 +97,11 @@ void arm_uart_interrupt_handler( void ) {
 
 void serial_init()
 {
-#ifdef PART_LM4F120H5QR
-  //code for ARM
   rx_buffer_head = rx_buffer_tail = 0;
   tx_buffer_head = tx_buffer_tail = 0;
 
+#ifdef PART_LM4F120H5QR
+  //code for ARM
   SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA ); //enable pins which correspond to RxD and TxD signals
   SysCtlDelay( 26 ); // Delay 1usec for peripherial to start
   GPIOPinConfigure( GPIO_PA0_U0RX ); //configure pin to be RxD of UART0
@@ -125,7 +125,7 @@ void serial_init()
   // Set baud rate
   #if BAUD_RATE < 57600
     uint16_t UBRR0_value = ((F_CPU / (8L * BAUD_RATE)) - 1)/2 ;
-    UCSR0A &= ~(1 << U2X0); // baud doubler off  - Only needed on Uno XXX
+    UCSR0A &= ~(1 << U2X0); // baud doubler off  - Only needed on Uno XX
   #else
     uint16_t UBRR0_value = ((F_CPU / (4L * BAUD_RATE)) - 1)/2;
     UCSR0A |= (1 << U2X0);  // baud doubler on for high baud rates, i.e. 115200

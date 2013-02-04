@@ -56,7 +56,7 @@ void protocol_init()
 
 #ifdef PART_LM4F120H5QR
   // ARM code
-  SysCtlPeripheralEnable( PINOUT_SYSCTL_PERIPH ); ///Enable the GPIO module for PINOUT port
+  SysCtlPeripheralEnable( PINOUT_PERIPH ); ///Enable the GPIO module for PINOUT port
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
 
   GPIOPinTypeGPIOInput( PINOUT_PORT, PINOUT_MASK ); // Set as input pins

@@ -22,7 +22,9 @@
 #ifndef config_h
 #define config_h
 
-#define F_CPU 80000000 // 80 MHz
+#ifndef F_CPU
+	#define F_CPU 80000000 // 80 MHz
+#endif
 
 // IMPORTANT: Any changes here requires a full re-compiling of the source code to propagate them.
 
@@ -30,56 +32,54 @@
 #define DEFAULTS_GENERIC
 
 // Serial baud rate
-#define BAUD_RATE 9600 /// hardcoded 115200 for LM4F120H5QR devboard
+#define BAUD_RATE 9600 /// hardcoded 115200 for ARM LM4F120H5QR devboard
 
 // Define pin-assignments
 // NOTE: All step bit and direction pins must be on the same port.
-#define STEPPING_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
-#define STEPPING_DDR       DDRD
+#define STEPPING_PERIPH    SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define STEPPING_DDR       DDRD // AVR only
 #define STEPPING_PORT      GPIO_PORTF_BASE //PORTD for AVR, GPIO_PORTF_BASE for Cortex
-#define X_STEP_BIT         1  // Uno Digital Pin 2
-#define Y_STEP_BIT         2  // Uno Digital Pin 3
-#define Z_STEP_BIT         3  // Uno Digital Pin 4
-#define X_DIRECTION_BIT    5  // Uno Digital Pin 5
-#define Y_DIRECTION_BIT    5  // Uno Digital Pin 6
-#define Z_DIRECTION_BIT    5  // Uno Digital Pin 7
+#define X_STEP_BIT         1 // Uno Digital Pin 2
+#define Y_STEP_BIT         2 // Uno Digital Pin 3
+#define Z_STEP_BIT         3 // Uno Digital Pin 4
+#define X_DIRECTION_BIT    5 // Uno Digital Pin 5
+#define Y_DIRECTION_BIT    5 // Uno Digital Pin 6
+#define Z_DIRECTION_BIT    5 // Uno Digital Pin 7
 #define STEP_MASK ((1<<X_STEP_BIT)|(1<<Y_STEP_BIT)|(1<<Z_STEP_BIT)) // All step bits
 #define DIRECTION_MASK ((1<<X_DIRECTION_BIT)|(1<<Y_DIRECTION_BIT)|(1<<Z_DIRECTION_BIT)) // All direction bits
 #define STEPPING_MASK (STEP_MASK | DIRECTION_MASK) // All stepping-related bits (step/direction)
 
-#define STEPPERS_DISABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
-#define STEPPERS_DISABLE_DDR    DDRE
+#define STEPPERS_DISABLE_PERIPH	SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define STEPPERS_DISABLE_DDR    DDRB // AVR only
 #define STEPPERS_DISABLE_PORT   GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define STEPPERS_DISABLE_BIT    0  // Uno Digital Pin 8
 #define STEPPERS_DISABLE_MASK (1<<STEPPERS_DISABLE_BIT)
 
 // NOTE: All limit bit pins must be on the same port
-#define LIMIT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
-#define LIMIT_DDR       DDRE
-///#define LIMIT_PIN       PINB ///don't have this in ARM
+#define LIMIT_PERIPH    SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define LIMIT_DDR       DDRB
+#define LIMIT_PIN       PINB // AVR only
 #define LIMIT_PORT      GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define X_LIMIT_BIT     1  // Uno Digital Pin 9
 #define Y_LIMIT_BIT     2  // Uno Digital Pin 10
 #define Z_LIMIT_BIT     3  // Uno Digital Pin 11
+#define LIMIT_INT       PCIE0  // Pin change interrupt enable pin
+#define LIMIT_INT_vect  PCINT0_vect 
+#define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
 #define LIMIT_MASK ((1<<X_LIMIT_BIT)|(1<<Y_LIMIT_BIT)|(1<<Z_LIMIT_BIT)) // All limit bits
 
-// Config for interrupt on pin change (pins for limit switches) todo
-///#define LIMIT_INT       PCIE0  // Pin change interrupt enable pin
-///#define LIMIT_INT_vect  PCINT0_vect
-///#define LIMIT_PCMSK     PCMSK0 // Pin change interrupt register
-
-#define SPINDLE_ENABLE_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
-#define SPINDLE_ENABLE_DDR   DDRE
+#define SPINDLE_ENABLE_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_ENABLE_DDR   DDRB // AVR only
 #define SPINDLE_ENABLE_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_ENABLE_BIT   4  // Uno Digital Pin 12
 
-#define SPINDLE_DIRECTION_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
-#define SPINDLE_DIRECTION_DDR   DDRE
+#define SPINDLE_DIRECTION_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define SPINDLE_DIRECTION_DDR   DDRB // AVR only
 #define SPINDLE_DIRECTION_PORT  GPIO_PORTE_BASE //PORTB for AVR, GPIO_PORTB_BASE for Cortex
 #define SPINDLE_DIRECTION_BIT   5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
 
-#define COOLANT_FLOOD_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
-#define COOLANT_FLOOD_DDR   DDRE
+#define COOLANT_FLOOD_PERIPH SYSCTL_PERIPH_GPIOE //defined for Cortex M4F
+#define COOLANT_FLOOD_DDR   DDRC // AVR only
 #define COOLANT_FLOOD_PORT  GPIO_PORTE_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
 #define COOLANT_FLOOD_BIT   6  // Uno Analog Pin 3
 
@@ -87,31 +87,29 @@
 // a later date if flash and memory space allows.
 // #define ENABLE_M7  // Mist coolant disabled by default. Uncomment to enable.
 #ifdef ENABLE_M7
-  #define COOLANT_MIST_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
-  #define COOLANT_MIST_DDR   DDRC
+  #define COOLANT_MIST_PERIPH SYSCTL_PERIPH_GPIOC //defined for Cortex M4F
+  #define COOLANT_MIST_DDR   DDRC // AVR only
   #define COOLANT_MIST_PORT  GPIO_PORTC_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
   #define COOLANT_MIST_BIT   4 // Uno Analog Pin 4
-#endif
+#endif  
 
 // NOTE: All pinouts pins must be on the same port
-#define PINOUT_SYSCTL_PERIPH SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
-#define PINOUT_DDR       DDRF
-///#define PINOUT_PIN       PINC /// don't have this in ARM
+#define PINOUT_PERIPH    SYSCTL_PERIPH_GPIOF //defined for Cortex M4F
+#define PINOUT_DDR       DDRC // AVR only
+#define PINOUT_PIN       PINC // AVR only
 #define PINOUT_PORT      GPIO_PORTF_BASE //PORTC for AVR, GPIO_PORTC_BASE for Cortex
 #define PIN_RESET        6  // Uno Analog Pin 0
 #define PIN_FEED_HOLD    4  // Uno Analog Pin 1
 #define PIN_CYCLE_START  0  // Uno Analog Pin 2
+#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin, AVR only
+#define PINOUT_INT_vect  PCINT1_vect // ARV only
+#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register, AVR only
 #define PINOUT_MASK ((1<<PIN_RESET)|(1<<PIN_FEED_HOLD)|(1<<PIN_CYCLE_START))
-
-// Config for interrupt on pin change (pins for reset, feed hold and cycle start buttons)
-///#define PINOUT_INT       PCIE1  // Pin change interrupt enable pin
-///#define PINOUT_INT_vect  PCINT1_vect
-///#define PINOUT_PCMSK     PCMSK1 // Pin change interrupt register
 
 // Define runtime command special characters. These characters are 'picked-off' directly from the
 // serial read data stream and are not passed to the grbl line execution parser. Select characters
-// that do not and must not exist in the streamed g-code program. ASCII control characters may be
-// used, if they are available per user setup. Also, extended ASCII codes (>127), which are never in
+// that do not and must not exist in the streamed g-code program. ASCII control characters may be 
+// used, if they are available per user setup. Also, extended ASCII codes (>127), which are never in 
 // g-code programs, maybe selected for interface programs.
 // NOTE: If changed, manually update help message in report.c.
 #define CMD_STATUS_REPORT '?'
@@ -119,32 +117,57 @@
 #define CMD_CYCLE_START '~'
 #define CMD_RESET 0x18 // ctrl-x
 
+// The "Stepper Driver Interrupt" employs the Pramod Ranade inverse time algorithm to manage the
+// Bresenham line stepping algorithm. The value ISR_TICKS_PER_SECOND is the frequency(Hz) at which
+// the Ranade algorithm ticks at. Maximum step frequencies are limited by the Ranade frequency by
+// approximately 0.75-0.9 * ISR_TICK_PER_SECOND. Meaning for 20kHz, the max step frequency is roughly
+// 15-18kHz. An Arduino can safely complete a single interrupt of the current stepper driver algorithm 
+// theoretically up to a frequency of 35-40kHz, but CPU overhead increases exponentially as this
+// frequency goes up. So there will be little left for other processes like arcs.  
+//   In future versions, more work will be done to increase the step rates but still stay around
+// 20kHz by performing two steps per step event, rather than just one.
+#define ISR_TICKS_PER_SECOND 30000L  // Integer (Hz)
+
 // The temporal resolution of the acceleration management subsystem. Higher number give smoother
-// acceleration but may impact performance.
-// NOTE: Increasing this parameter will help any resolution related issues, especially with machines
-// requiring very high accelerations and/or very fast feedrates. In general, this will reduce the
-// error between how the planner plans the motions and how the stepper program actually performs them.
-// However, at some point, the resolution can be high enough, where the errors related to numerical
-// round-off can be great enough to cause problems and/or it's too fast for the Arduino. The correct
-// value for this parameter is machine dependent, so it's advised to set this only as high as needed.
-// Approximate successful values can range from 30L to 100L or more.
-#define ACCELERATION_TICKS_PER_SECOND 250L //was 50L for AVR. Maybe if ARM is 5x faster, then the value should be 5x bigger?
+// acceleration but may impact performance. If you run at very high feedrates (>15kHz or so) and 
+// very high accelerations, this will reduce the error between how the planner plans the velocity
+// profiles and how the stepper program actually performs them. The correct value for this parameter
+// is machine dependent, so it's advised to set this only as high as needed. Approximate successful
+// values can widely range from 50 to 200 or more. Cannot be greater than ISR_TICKS_PER_SECOND/2.
+#define ACCELERATION_TICKS_PER_SECOND 120L 
+
+// NOTE: Make sure this value is less than 256, when adjusting both dependent parameters.
+#define ISR_TICKS_PER_ACCELERATION_TICK (ISR_TICKS_PER_SECOND/ACCELERATION_TICKS_PER_SECOND)
+
+// The Ranade algorithm can use either floating point or long integers for its counters, but for 
+// integers the counter values must be scaled since these values can be very small (10^-6). This
+// multiplier value scales the floating point counter values for use in a long integer. Long integers
+// are finite so select the multiplier value high enough to avoid any numerical round-off issues and
+// still have enough range to account for all motion types. However, in most all imaginable CNC
+// applications, the following multiplier value will work more than well enough. If you do have
+// happened to weird stepper motion issues, try modifying this value by adding or subtracting a 
+// zero and report it to the Grbl administrators. 
+#define RANADE_MULTIPLIER 100000000.0
 
 // Minimum planner junction speed. Sets the default minimum speed the planner plans for at the end
 // of the buffer and all stops. This should not be much greater than zero and should only be changed
 // if unwanted behavior is observed on a user's machine when running at very slow speeds.
 #define MINIMUM_PLANNER_SPEED 0.0 // (mm/min)
 
-// Minimum stepper rate. Sets the absolute minimum stepper rate in the stepper program and never runs
-// slower than this value, except when sleeping. This parameter overrides the minimum planner speed.
-// This is primarily used to guarantee that the end of a movement is always reached and not stop to
-// never reach its target. This parameter should always be greater than zero.
+// Minimum stepper rate for the "Stepper Driver Interrupt". Sets the absolute minimum stepper rate 
+// in the stepper program and never runs slower than this value. If the RANADE_MULTIPLIER value
+// changes, it will affect how this value works. So, if a zero is add/subtracted from the
+// RANADE_MULTIPLIER value, do the same to this value if you want to same response. 
+// NOTE: Compute by (desired_step_rate/60) * RANADE_MULTIPLIER/ISR_TICKS_PER_SECOND. (mm/min)
+#define MINIMUM_STEP_RATE 1000L // Integer (mult*mm/isr_tic)
+
+// Minimum stepper rate. Only used by homing at this point. May be removed in later releases.
 #define MINIMUM_STEPS_PER_MINUTE 800 // (steps/min) - Integer value only
 
 // Time delay increments performed during a dwell. The default value is set at 50ms, which provides
 // a maximum time delay of roughly 55 minutes, more than enough for most any application. Increasing
-// this delay will increase the maximum dwell time linearly, but also reduces the responsiveness of
-// run-time command executions, like status reports, since these are performed between each dwell
+// this delay will increase the maximum dwell time linearly, but also reduces the responsiveness of 
+// run-time command executions, like status reports, since these are performed between each dwell 
 // time step. Also, keep in mind that the Arduino delay timer is not very accurate for long delays.
 #define DWELL_TIME_STEP 50 // Integer (1-255) (milliseconds)
 
@@ -161,9 +184,9 @@
 #define HOMING_RATE_ADJUST // Comment to disable
 
 // Define the homing cycle search patterns with bitmasks. The homing cycle first performs a search
-// to engage the limit switches. HOMING_SEARCH_CYCLE_x are executed in order starting with suffix 0
-// and searches the enabled axes in the bitmask. This allows for users with non-standard cartesian
-// machines, such as a lathe (x then z), to configure the homing cycle behavior to their needs.
+// to engage the limit switches. HOMING_SEARCH_CYCLE_x are executed in order starting with suffix 0 
+// and searches the enabled axes in the bitmask. This allows for users with non-standard cartesian 
+// machines, such as a lathe (x then z), to configure the homing cycle behavior to their needs. 
 // Search cycle 0 is required, but cycles 1 and 2 are both optional and may be commented to disable.
 // After the search cycle, homing then performs a series of locating about the limit switches to hone
 // in on machine zero, followed by a pull-off maneuver. HOMING_LOCATE_CYCLE governs these final moves,
@@ -175,7 +198,7 @@
 #define HOMING_LOCATE_CYCLE   ((1<<X_AXIS)|(1<<Y_AXIS)|(1<<Z_AXIS)) // Must contain ALL search axes
 
 // Number of homing cycles performed after when the machine initially jogs to limit switches.
-// This help in preventing overshoot and should improve repeatability. This value should be one or
+// This help in preventing overshoot and should improve repeatability. This value should be one or 
 // greater.
 #define N_HOMING_LOCATE_CYCLE 2 // Integer (1-128)
 
@@ -185,61 +208,51 @@
 // parser state depending on user preferences.
 #define N_STARTUP_LINE 2 // Integer (1-5)
 
+// Number of arc generation iterations by small angle approximation before exact arc trajectory 
+// correction. This parameter maybe decreased if there are issues with the accuracy of the arc
+// generations. In general, the default value is more than enough for the intended CNC applications
+// of grbl, and should be on the order or greater than the size of the buffer to help with the 
+// computational efficiency of generating arcs.
+#define N_ARC_CORRECTION 20 // Integer (1-255)
+
 // ---------------------------------------------------------------------------------------
-// FOR ADVANCED USERS ONLY:
+// FOR ADVANCED USERS ONLY: 
 
 // The number of linear motions in the planner buffer to be planned at any give time. The vast
-// majority of RAM that Grbl uses is based on this buffer size. Only increase if there is extra
+// majority of RAM that Grbl uses is based on this buffer size. Only increase if there is extra 
 // available RAM, like when re-compiling for a Teensy or Sanguino. Or decrease if the Arduino
 // begins to crash due to the lack of available RAM or if the CPU is having trouble keeping
-// up with planning new incoming motions as they are executed.
+// up with planning new incoming motions as they are executed. 
 // #define BLOCK_BUFFER_SIZE 18  // Uncomment to override default in planner.h.
 
-// Line buffer size from the serial input stream to be executed. Also, governs the size of
+// Line buffer size from the serial input stream to be executed. Also, governs the size of 
 // each of the startup blocks, as they are each stored as a string of this size. Make sure
 // to account for the available EEPROM at the defined memory address in settings.h and for
 // the number of desired startup blocks.
-// NOTE: 50 characters is not a problem except for extreme cases, but the line buffer size
-// can be too small and g-code blocks can get truncated. Officially, the g-code standards
-// support up to 256 characters. In future versions, this default will be increased, when
+// NOTE: 50 characters is not a problem except for extreme cases, but the line buffer size 
+// can be too small and g-code blocks can get truncated. Officially, the g-code standards 
+// support up to 256 characters. In future versions, this default will be increased, when 
 // we know how much extra memory space we can re-invest into this.
 // #define LINE_BUFFER_SIZE 50  // Uncomment to override default in protocol.h
-
+  
 // Serial send and receive buffer size. The receive buffer is often used as another streaming
 // buffer to store incoming blocks to be processed by Grbl when its ready. Most streaming
-// interfaces will character count and track each block send to each block response. So,
+// interfaces will character count and track each block send to each block response. So, 
 // increase the receive buffer if a deeper receive buffer is needed for streaming and avaiable
 // memory allows. The send buffer primarily handles messages in Grbl. Only increase if large
 // messages are sent and Grbl begins to stall, waiting to send the rest of the message.
 // #define RX_BUFFER_SIZE 128 // Uncomment to override defaults in serial.h
 // #define TX_BUFFER_SIZE 64
-
+  
 // Toggles XON/XOFF software flow control for serial communications. Not officially supported
 // due to problems involving the Atmega8U2 USB-to-serial chips on current Arduinos. The firmware
-// on these chips do not support XON/XOFF flow control characters and the intermediate buffer
-// in the chips cause latency and overflow problems with standard terminal programs. However,
+// on these chips do not support XON/XOFF flow control characters and the intermediate buffer 
+// in the chips cause latency and overflow problems with standard terminal programs. However, 
 // using specifically-programmed UI's to manage this latency problem has been confirmed to work.
 // As well as, older FTDI FT232RL-based Arduinos(Duemilanove) are known to work with standard
 // terminal programs since their firmware correctly manage these XON/XOFF characters. In any
 // case, please report any successes to grbl administrators!
 // #define ENABLE_XONXOFF // Default disabled. Uncomment to enable.
-
-// Creates a delay between the direction pin setting and corresponding step pulse by creating
-// another interrupt (Timer2 compare) to manage it. The main Grbl interrupt (Timer1 compare)
-// sets the direction pins, and does not immediately set the stepper pins, as it would in
-// normal operation. The Timer2 compare fires next to set the stepper pins after the step
-// pulse delay time, and Timer2 overflow will complete the step pulse, except now delayed
-// by the step pulse time plus the step pulse delay. (Thanks langwadt for the idea!)
-//   This is an experimental feature that should only be used if your setup requires a longer
-// delay between direction and step pin settings (some opto coupler based drivers), as it may
-// adversely effect Grbl's high-end performance (>10kHz). Please notify Grbl administrators
-// of your successes or difficulties, as we will monitor this and possibly integrate this as a
-// standard feature for future releases. However, we suggest to first try our direction delay
-// hack/solution posted in the Wiki involving inverting the stepper pin mask.
-// NOTE: Uncomment to enable. The recommended delay must be > 3us and the total step pulse
-// time, which includes the Grbl settings pulse microseconds, must not exceed 127us. Reported
-// successful values for certain setups have ranged from 10 to 20us.
-// #define STEP_PULSE_DELAY 10 // Step pulse delay in microseconds. Default disabled.
 
 // ---------------------------------------------------------------------------------------
 

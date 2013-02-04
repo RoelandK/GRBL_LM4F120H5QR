@@ -393,13 +393,13 @@ void st_init()
 {
   // Configure directions of interface pins
 ///  STEPPING_DDR |= STEPPING_MASK;
-  SysCtlPeripheralEnable( STEPPING_SYSCTL_PERIPH );
+  SysCtlPeripheralEnable( STEPPING_PERIPH );
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
   GPIOPinTypeGPIOOutput( STEPPING_PORT, STEPPING_MASK );
 ///  STEPPING_PORT = (STEPPING_PORT & ~STEPPING_MASK) | settings.invert_mask;
   GPIOPinWrite( STEPPING_PORT, STEPPING_MASK, settings.invert_mask );
 ///  STEPPERS_DISABLE_DDR |= 1<<STEPPERS_DISABLE_BIT;
-  SysCtlPeripheralEnable( STEPPERS_DISABLE_SYSCTL_PERIPH );
+  SysCtlPeripheralEnable( STEPPERS_DISABLE_PERIPH );
   GPIOPinTypeGPIOOutput( STEPPERS_DISABLE_PORT, (1<<STEPPERS_DISABLE_BIT) );
 
 /*

@@ -34,12 +34,12 @@ void spindle_init()
 {
   current_direction = 0;
   ///SPINDLE_ENABLE_DDR |= (1<<SPINDLE_ENABLE_BIT);
-  SysCtlPeripheralEnable( SPINDLE_ENABLE_SYSCTL_PERIPH );
+  SysCtlPeripheralEnable( SPINDLE_ENABLE_PERIPH );
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
   GPIOPinTypeGPIOOutput( SPINDLE_ENABLE_PORT, (1<<SPINDLE_ENABLE_BIT) );
 
   ///SPINDLE_DIRECTION_DDR |= (1<<SPINDLE_DIRECTION_BIT);
-  SysCtlPeripheralEnable( SPINDLE_DIRECTION_SYSCTL_PERIPH );
+  SysCtlPeripheralEnable( SPINDLE_DIRECTION_PERIPH );
   SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
   GPIOPinTypeGPIOOutput( SPINDLE_DIRECTION_PORT, (1<<SPINDLE_DIRECTION_BIT) );
 

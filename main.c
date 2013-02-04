@@ -23,14 +23,19 @@
    been integral throughout the development of the higher level details of Grbl, as well
    as being a consistent sounding board for the future of accessible and free CNC. */
 
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "inc/hw_ints.h"
-#include "driverlib/pin_map.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
-#include "driverlib/fpu.h"
-#include "driverlib/interrupt.h"
+#ifdef PART_LM4F120H5QR
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "inc/hw_ints.h"
+  #include "driverlib/pin_map.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/gpio.h"
+  #include "driverlib/fpu.h"
+  #include "driverlib/interrupt.h"
+#else
+  #include <avr/interrupt.h>
+  #include <avr/pgmspace.h>
+#endif
 
 #include "config.h"
 #include "planner.h"
@@ -47,33 +52,33 @@
 #include "serial.h"
 
 // Declare system global variable structure
-system_t sys;
+system_t sys; 
 
-void main(void)
+int main(void)
 {
-	SysCtlClockSet( SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN ); //set system clock to 80 MHz
-	FPUEnable(); //enable the Floating Point Unit
-//	FPULazyStackingEnable(); // Enable stacking for interrupt handlers
+#ifdef PART_LM4F120H5QR // ARM code
+  SysCtlClockSet( SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN ); //set system clock to 80 MHz
+  FPUEnable(); //enable the Floating Point Unit
+//  FPULazyStackingEnable(); // Enable stacking for interrupt handlers
+#endif
 
   // Initialize system
-  serial_init(); // Enable and Initialize the UART.
+  serial_init(); // Setup serial baud rate and interrupts
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
 
-#ifdef PART_LM4F120H5QR
-  // ARM code
+#ifdef PART_LM4F120H5QR // ARM code
   IntMasterEnable();
-#else
-  // AVR code
+#else // AVR code
   sei(); // Enable interrupts
 #endif
-
+  
   memset(&sys, 0, sizeof(sys));  // Clear all system variables
   sys.abort = true;   // Set abort to complete initialization
   sys.state = STATE_INIT;  // Set alarm state to indicate unknown initial position
-
+  
   for(;;) {
-
+  
     // Execute system reset upon a system abort, where the main program will return to this loop.
     // Once here, it is safe to re-initialize the system. At startup, the system will automatically
     // reset to finish the initialization process.
@@ -89,14 +94,14 @@ void main(void)
       st_reset(); // Clear stepper subsystem variables.
 
       // Sync cleared gcode and planner positions to current system position, which is only
-      // cleared upon startup, not a reset/abort.
+      // cleared upon startup, not a reset/abort. 
       sys_sync_current_position();
 
       // Reset system variables.
       sys.abort = false;
       sys.execute = 0;
       if (bit_istrue(settings.flags,BITFLAG_AUTO_START)) { sys.auto_start = true; }
-
+      
       // Check for power-up and set system alarm if homing is enabled to force homing cycle
       // by setting Grbl's alarm state. Alarm locks out all g-code commands, including the
       // startup scripts, but allows access to settings and internal commands. Only a homing
@@ -107,20 +112,25 @@ void main(void)
       #ifdef HOMING_INIT_LOCK
         if (sys.state == STATE_INIT && bit_istrue(settings.flags,BITFLAG_HOMING_ENABLE)) { sys.state = STATE_ALARM; }
       #endif
-
+      
       // Check for and report alarm state after a reset, error, or an initial power up.
       if (sys.state == STATE_ALARM) {
-        report_feedback_message(MESSAGE_ALARM_LOCK);
+        report_feedback_message(MESSAGE_ALARM_LOCK); 
       } else {
         // All systems go. Set system to ready and execute startup script.
         sys.state = STATE_IDLE;
-        protocol_execute_startup();
+        protocol_execute_startup(); 
       }
     }
-
+    
     protocol_execute_runtime();
     protocol_process(); // ... process the serial protocol
-
+    
+    // When the serial protocol returns, there are no more characters in the serial read buffer to
+    // be processed and executed. This indicates that individual commands are being issued or 
+    // streaming is finished. In either case, auto-cycle start, if enabled, any queued moves.
+    if (sys.auto_start) { st_cycle_start(); }
+    
   }
-  ///return 0;   /* never reached */
+  // return 0;   /* never reached */
 }
