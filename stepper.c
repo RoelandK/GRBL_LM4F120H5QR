@@ -22,7 +22,20 @@
 /* The timer calculations of this module informed by the 'RepRap cartesian firmware' by Zack Smith
    and Philipp Tiefenbacher. */
 
-#include <avr/interrupt.h>
+#ifdef PART_LM4F120H5QR // code for ARM
+  //#include "inc/hw_gpio.h"
+  #include "inc/hw_types.h"
+  #include "inc/hw_memmap.h"
+  #include "inc/hw_ints.h"
+  #include "driverlib/interrupt.h"
+  #include "driverlib/sysctl.h"
+  #include "driverlib/timer.h"
+  #include "driverlib/gpio.h"
+#else // code for AVR
+  #include <avr/io.h>
+  #include <avr/interrupt.h>
+#endif
+
 #include "stepper.h"
 #include "config.h"
 #include "settings.h"
@@ -38,9 +51,9 @@
 typedef struct {
   // Used by the bresenham line algorithm
   int32_t counter_x,        // Counter variables for the bresenham line tracer
-          counter_y, 
+          counter_y,
           counter_z;
-  uint32_t event_count;     // Total event count. Retained for feed holds. 
+  uint32_t event_count;     // Total event count. Retained for feed holds.
   uint32_t step_events_remaining;  // Steps remaining in motion
 
   // Used by Pramod Ranade inverse time algorithm
@@ -51,12 +64,18 @@ typedef struct {
   uint8_t execute_step; // Flags step execution for each interrupt.
   
 } stepper_t;
+
 static stepper_t st;
 static block_t *current_block;  // A pointer to the block currently being traced
 
 // Used by the stepper driver interrupt
-static uint8_t step_pulse_time; // Step pulse reset time after step rise
-static uint8_t out_bits;        // The next stepping-bits to be output
+#ifdef PART_LM4F120H5QR // code for ARM
+  static uint32_t step_pulse_time; // Step pulse reset time after step rise
+  static uint32_t out_bits;        // The next stepping-bits to be output
+#else // code for AVR
+  static uint8_t step_pulse_time; // Step pulse reset time after step rise
+  static uint8_t out_bits;        // The next stepping-bits to be output
+#endif
 
 // NOTE: If the main interrupt is guaranteed to be complete before the next interrupt, then
 // this blocking variable is no longer needed. Only here for safety reasons.
@@ -83,41 +102,76 @@ static volatile uint8_t busy;   // True when "Stepper Driver Interrupt" is being
 void st_wake_up() 
 {
   // Enable steppers by resetting the stepper disable port
-  if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) { 
-    STEPPERS_DISABLE_PORT |= (1<<STEPPERS_DISABLE_BIT); 
-  } else { 
-    STEPPERS_DISABLE_PORT &= ~(1<<STEPPERS_DISABLE_BIT);
+  if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) {
+  	#ifdef PART_LM4F120H5QR // code for ARM
+  	  GPIOPinWrite( STEPPERS_DISABLE_PORT, STEPPERS_DISABLE_BIT, 0xFF );
+  	#else // code for AVR
+      STEPPERS_DISABLE_PORT |= (1<<STEPPERS_DISABLE_BIT);
+  	#endif
+  } else {
+  	#ifdef PART_LM4F120H5QR // code for ARM
+  	  GPIOPinWrite( STEPPERS_DISABLE_PORT, STEPPERS_DISABLE_BIT, 0x00 );
+  	#else // code for AVR
+      STEPPERS_DISABLE_PORT &= ~(1<<STEPPERS_DISABLE_BIT);
+  	#endif
   }
   if (sys.state == STATE_CYCLE) {
     // Initialize stepper output bits
     out_bits = settings.invert_mask; 
+
     // Initialize step pulse timing from settings.
-    step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
+    #ifdef PART_LM4F120H5QR // code for ARM
+      step_pulse_time = ( settings.pulse_microseconds - 2 ) * TICKS_PER_MICROSECOND;
+    #else // code for AVR
+      step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
+    #endif
+    
     // Enable stepper driver interrupt
     st.execute_step = false;
-    TCNT2 = 0; // Clear Timer2
-    TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
-    TCCR2B = (1<<CS21); // Begin Timer2. Full speed, 1/8 prescaler
+
+    #ifdef PART_LM4F120H5QR // code for ARM
+      HWREG( TIMER2_BASE + 0x0050 ) = (uint32_t) 0; // clear Timer2 value
+      TimerLoadSet( TIMER2_BASE, TIMER_A, step_pulse_time ); // setup ceiling for Timer2
+      TimerEnable( TIMER2_BASE, TIMER_A ); // begin Timer2, no prescaler
+   	#else // code for AVR
+      TCNT2 = 0; // Clear Timer2
+      TIMSK2 |= (1<<OCIE2A); // Enable Timer2 Compare Match A interrupt
+      TCCR2B = (1<<CS21); // Begin Timer2. Full speed, 1/8 prescaler
+    #endif
   }
 }
 
 // Stepper shutdown
-void st_go_idle() 
+void st_go_idle()
 {
   // Disable stepper driver interrupt. Allow Timer0 to finish. It will disable itself.
-  TIMSK2 &= ~(1<<OCIE2A); // Disable Timer2 interrupt
-  TCCR2B = 0; // Disable Timer2
+  #ifdef PART_LM4F120H5QR // code for ARM
+    // todo: disable time2_int?
+    TimerDisable( TIMER2_BASE, TIMER_A );
+    HWREG( TIMER2_BASE + 0x0050 ) = (uint32_t) 0; //reset timer2 value
+  #else // code for AVR
+    TIMSK2 &= ~(1<<OCIE2A); // Disable Timer2 interrupt
+    TCCR2B = 0; // Disable Timer2
+  #endif
 
   // Disable steppers only upon system alarm activated or by user setting to not be kept enabled.
   if ((settings.stepper_idle_lock_time != 0xff) || bit_istrue(sys.execute,EXEC_ALARM)) {
     // Force stepper dwell to lock axes for a defined amount of time to ensure the axes come to a complete
     // stop and not drift from residual inertial forces at the end of the last movement.
     delay_ms(settings.stepper_idle_lock_time);
-    if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) { 
-      STEPPERS_DISABLE_PORT &= ~(1<<STEPPERS_DISABLE_BIT); 
+    if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) {
+      #ifdef PART_LM4F120H5QR // code for ARM
+        GPIOPinWrite( STEPPERS_DISABLE_PORT, STEPPERS_DISABLE_BIT, 0 );
+      #else // code for AVR
+        STEPPERS_DISABLE_PORT &= ~(1<<STEPPERS_DISABLE_BIT); 
+      #endif
     } else { 
-      STEPPERS_DISABLE_PORT |= (1<<STEPPERS_DISABLE_BIT); 
-    }   
+      #ifdef PART_LM4F120H5QR // code for ARM
+        GPIOPinWrite( STEPPERS_DISABLE_PORT, STEPPERS_DISABLE_BIT, 0xFF );
+      #else // code for AVR
+        STEPPERS_DISABLE_PORT |= (1<<STEPPERS_DISABLE_BIT); 
+      #endif
+    }
   }
 }
 
@@ -138,8 +192,16 @@ void st_go_idle()
 //
 // NOTE: Average time in this ISR is: 5 usec iterating timers only, 20-25 usec with step event, or
 // 15 usec when popping a block. So, ensure Ranade frequency and step pulse times work with this.
-ISR(TIMER2_COMPA_vect)
+#ifdef PART_LM4F120H5QR // code for ARM
+  void timer2_interrupt( void )
+#else // code for AVR
+  ISR(TIMER2_COMPA_vect)
+#endif
 {
+  #ifdef PART_LM4F120H5QR // code for ARM
+    TimerIntClear( TIMER2_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
+  #endif
+
 // SPINDLE_ENABLE_PORT ^= 1<<SPINDLE_ENABLE_BIT; // Debug: Used to time ISR
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
   
@@ -147,14 +209,24 @@ ISR(TIMER2_COMPA_vect)
   // before any step pulse due to algorithm design.
   if (st.execute_step) {
     st.execute_step = false;
-    STEPPING_PORT = ( STEPPING_PORT & ~(DIRECTION_MASK | STEP_MASK) ) | out_bits;
-    TCNT0 = step_pulse_time; // Reload Timer0 counter.
-    TCCR0B = (1<<CS21); // Begin Timer0. Full speed, 1/8 prescaler
+    #ifdef PART_LM4F120H5QR // code for ARM
+      GPIOPinWrite( STEPPING_PORT, DIRECTION_MASK | STEP_MASK, out_bits );
+      HWREG( TIMER0_BASE + 0x0050 ) = (uint32_t) 0; // clear Timer0_timerA value
+      TimerLoadSet( TIMER0_BASE, TIMER_A, step_pulse_time ); // setup ceiling for Timer0
+      TimerEnable( TIMER0_BASE, TIMER_A ); // begin Timer0, no prescaler
+    #else // code for AVR
+      STEPPING_PORT = ( STEPPING_PORT & ~(DIRECTION_MASK | STEP_MASK) ) | out_bits;
+      TCNT0 = step_pulse_time; // Reload Timer0 counter.
+      TCCR0B = (1<<CS21); // Begin Timer0. Full speed, 1/8 prescaler
+    #endif
   }
   
   busy = true;
-  sei(); // Re-enable interrupts. This ISR will still finish before returning to main program.
   
+  #ifndef PART_LM4F120H5QR
+    sei(); // Re-enable interrupts. This ISR will still finish before returning to main program.
+  #endif
+
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
   
@@ -290,6 +362,7 @@ ISR(TIMER2_COMPA_vect)
       // If current block is finished, reset pointer 
       current_block = NULL;
       plan_discard_current_block();
+      ///if (block_buffer_head != block_buffer_tail) block_buffer_tail = next_block_index( block_buffer_tail );
     }
 
     out_bits ^= settings.invert_mask;  // Apply step port invert mask    
@@ -301,12 +374,20 @@ ISR(TIMER2_COMPA_vect)
 // The Stepper Port Reset Interrupt: Timer0 OVF interrupt handles the falling edge of the
 // step pulse. This should always trigger before the next Timer2 COMPA interrupt and independently
 // finish, if Timer2 is disabled after completing a move.
-ISR(TIMER0_OVF_vect)
-{
-  STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (settings.invert_mask & STEP_MASK); 
-  TCCR0B = 0; // Disable timer until needed.
-}
+#ifdef PART_LM4F120H5QR // code for ARM
+  void timer0_interrupt( void ) {
+    TimerIntClear( TIMER0_BASE, TIMER_TIMA_TIMEOUT ); /// clear interrupt flag
+    HWREG( TIMER0_BASE + 0x054 ) = (uint32_t) 0; // clear Timer0 value
+    GPIOPinWrite( STEPPING_PORT, STEP_MASK, settings.invert_mask );
+  }
 
+#else // code for AVR
+  ISR(TIMER0_OVF_vect)
+  {
+    STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (settings.invert_mask & STEP_MASK);
+    TCCR0B = 0; // Disable timer until needed.
+  }
+#endif
 
 // Reset and clear stepper subsystem variables
 void st_reset()
@@ -319,23 +400,57 @@ void st_reset()
 // Initialize and start the stepper motor subsystem
 void st_init()
 {
-  // Configure directions of interface pins
-  STEPPING_DDR |= STEPPING_MASK;
-  STEPPING_PORT = (STEPPING_PORT & ~STEPPING_MASK) | settings.invert_mask;
-  STEPPERS_DISABLE_DDR |= 1<<STEPPERS_DISABLE_BIT;
-	
-  // Configure Timer 2
-  TIMSK2 &= ~(1<<OCIE2A); // Disable Timer2 interrupt while configuring it
-  TCCR2B = 0; // Disable Timer2 until needed
-  TCNT2 = 0; // Clear Timer2 counter
-  TCCR2A = (1<<WGM21);  // Set CTC mode
-  OCR2A = (F_CPU/ISR_TICKS_PER_SECOND)/8 - 1; // Set Timer2 CTC rate
-  
-  // Configure Timer 0
-  TIMSK0 &= ~(1<<TOIE0);
-  TCCR0A = 0; // Normal operation
-  TCCR0B = 0; // Disable Timer0 until needed
-  TIMSK0 |= (1<<TOIE0); // Enable overflow interrupt
+  #ifdef PART_LM4F120H5QR // code for ARM
+    SysCtlPeripheralEnable( STEPPING_PERIPH );
+    SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+    GPIOPinTypeGPIOOutput( STEPPING_PORT, STEPPING_MASK );
+    GPIOPinWrite( STEPPING_PORT, STEPPING_MASK, settings.invert_mask );
+
+    SysCtlPeripheralEnable( STEPPERS_DISABLE_PERIPH );
+    SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+    GPIOPinTypeGPIOOutput( STEPPERS_DISABLE_PORT, (1<<STEPPERS_DISABLE_BIT) );
+
+    // Configure Timer2
+    SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER2 );
+    SysCtlDelay(26); ///give time delay 1 microsecond for timer1 module to start
+    TimerConfigure( TIMER2_BASE, TIMER_CFG_PERIODIC_UP );
+    IntPrioritySet( INT_TIMER2A, 1<<5 ); // priority=1, lower than for Timer2 (which resets the step-dir signal)
+    TimerControlStall( TIMER2_BASE, TIMER_A, true ); //timer1 will stall in debug mode
+    TimerIntRegister( TIMER2_BASE, TIMER_A, timer2_interrupt );
+    TimerIntClear( TIMER2_BASE, 0xFFFF ); //disable timer1 immediate interrupt (bug of ARM?)
+    IntPendClear( INT_TIMER2A ); //disable timer1 immediate interrupt (bug of ARM?)
+    TimerIntEnable( TIMER2_BASE, TIMER_TIMA_TIMEOUT );
+
+    // Configure Timer0
+    SysCtlPeripheralEnable( SYSCTL_PERIPH_TIMER0 );
+    SysCtlDelay(26); // give time delay 1 microsecond for timer2 module to start
+    TimerConfigure( TIMER0_BASE, TIMER_CFG_ONE_SHOT_UP );
+    IntPrioritySet( INT_TIMER0A, 0 ); // highest priority - higher than for Timer2 (which sets the step-dir output)
+    TimerControlStall( TIMER0_BASE, TIMER_A, true ); //timer2 will stall in debug mode
+    TimerIntRegister( TIMER0_BASE, TIMER_A, timer0_interrupt );
+    TimerIntClear( TIMER0_BASE, 0xFFFF ); // disable timer2 immediate interrupt (bug of ARM?)
+    IntPendClear( INT_TIMER0A );
+    TimerIntEnable( TIMER0_BASE, TIMER_TIMA_TIMEOUT );
+
+  #else // code for AVR
+    // Configure directions of interface pins
+    STEPPING_DDR |= STEPPING_MASK;
+    STEPPING_PORT = (STEPPING_PORT & ~STEPPING_MASK) | settings.invert_mask;
+    STEPPERS_DISABLE_DDR |= 1<<STEPPERS_DISABLE_BIT;
+
+    // Configure Timer 2
+    TIMSK2 &= ~(1<<OCIE2A); // Disable Timer2 interrupt while configuring it
+    TCCR2B = 0; // Disable Timer2 until needed
+    TCNT2 = 0; // Clear Timer2 counter
+    TCCR2A = (1<<WGM21);  // Set CTC mode
+    OCR2A = (F_CPU/ISR_TICKS_PER_SECOND)/8 - 1; // Set Timer2 CTC rate
+
+    // Configure Timer 0
+    TIMSK0 &= ~(1<<TOIE0);
+    TCCR0A = 0; // Normal operation
+    TCCR0B = 0; // Disable Timer0 until needed
+    TIMSK0 |= (1<<TOIE0); // Enable overflow interrupt
+  #endif
   
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
   st_wake_up();

@@ -344,7 +344,8 @@ void plan_init()
   memset(&pl, 0, sizeof(pl)); // Clear planner struct
 }
 
-inline void plan_discard_current_block() 
+///inline
+void plan_discard_current_block()
 {
   if (block_buffer_head != block_buffer_tail) {
     block_buffer_tail = next_block_index( block_buffer_tail );

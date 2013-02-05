@@ -223,7 +223,7 @@ void mc_dwell(float seconds)
      // NOTE: Check and execute runtime commands during dwell every <= DWELL_TIME_STEP milliseconds.
      protocol_execute_runtime();
      if (sys.abort) { return; }
-     _delay_ms(DWELL_TIME_STEP); // Delay DWELL_TIME_STEP increment
+     delay_ms(DWELL_TIME_STEP); // Delay DWELL_TIME_STEP increment
    }
 }
 

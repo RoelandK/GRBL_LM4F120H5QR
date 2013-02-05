@@ -24,6 +24,8 @@
   #include "inc/hw_memmap.h"
   #include "driverlib/sysctl.h"
   #include "driverlib/gpio.h"
+#else // code for AVR
+  #include <avr/io.h>
 #endif
 
 #include "settings.h"
@@ -35,14 +37,30 @@ static uint8_t current_direction;
 void spindle_init()
 {
   current_direction = 0;
-  SPINDLE_ENABLE_DDR |= (1<<SPINDLE_ENABLE_BIT);
-  SPINDLE_DIRECTION_DDR |= (1<<SPINDLE_DIRECTION_BIT);  
+  
+  #ifdef PART_LM4F120H5QR // code for ARM
+    SysCtlPeripheralEnable( SPINDLE_ENABLE_PERIPH );
+    SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+    GPIOPinTypeGPIOOutput( SPINDLE_ENABLE_PORT, (1<<SPINDLE_ENABLE_BIT) );
+
+    SysCtlPeripheralEnable( SPINDLE_DIRECTION_PERIPH );
+    SysCtlDelay(26); ///give time delay 1 microsecond for GPIO module to start
+    GPIOPinTypeGPIOOutput( SPINDLE_DIRECTION_PORT, (1<<SPINDLE_DIRECTION_BIT) );
+  #else // code for AVR
+    SPINDLE_ENABLE_DDR |= (1<<SPINDLE_ENABLE_BIT);
+    SPINDLE_DIRECTION_DDR |= (1<<SPINDLE_DIRECTION_BIT);  
+  #endif
+  
   spindle_stop();
 }
 
 void spindle_stop()
 {
-  SPINDLE_ENABLE_PORT &= ~(1<<SPINDLE_ENABLE_BIT);
+  #ifdef PART_LM4F120H5QR // code for ARM
+    GPIOPinWrite( SPINDLE_ENABLE_PORT, SPINDLE_ENABLE_BIT, 0 );
+  #else // code for AVR
+    SPINDLE_ENABLE_PORT &= ~(1<<SPINDLE_ENABLE_BIT);
+  #endif
 }
 
 void spindle_run(int8_t direction) //, uint16_t rpm) 
@@ -51,11 +69,23 @@ void spindle_run(int8_t direction) //, uint16_t rpm)
     plan_synchronize();
     if (direction) {
       if(direction > 0) {
-        SPINDLE_DIRECTION_PORT &= ~(1<<SPINDLE_DIRECTION_BIT);
+        #ifdef PART_LM4F120H5QR // code for ARM
+          GPIOPinWrite( SPINDLE_DIRECTION_PORT, SPINDLE_DIRECTION_BIT, 0 );
+        #else // code for AVR
+          SPINDLE_DIRECTION_PORT &= ~(1<<SPINDLE_DIRECTION_BIT);
+        #endif
       } else {
-        SPINDLE_DIRECTION_PORT |= 1<<SPINDLE_DIRECTION_BIT;
+        #ifdef PART_LM4F120H5QR // code for ARM
+          GPIOPinWrite( SPINDLE_DIRECTION_PORT, SPINDLE_DIRECTION_BIT, 0xFF );
+        #else // code for AVR
+          SPINDLE_DIRECTION_PORT |= 1<<SPINDLE_DIRECTION_BIT;
+        #endif
       }
-      SPINDLE_ENABLE_PORT |= 1<<SPINDLE_ENABLE_BIT;
+      #ifdef PART_LM4F120H5QR // code for ARM
+        GPIOPinWrite( SPINDLE_ENABLE_PORT, SPINDLE_ENABLE_BIT, 0xFF );
+      #else // code for AVR
+        SPINDLE_ENABLE_PORT |= 1<<SPINDLE_ENABLE_BIT;
+      #endif
     } else {
       spindle_stop();     
     }
